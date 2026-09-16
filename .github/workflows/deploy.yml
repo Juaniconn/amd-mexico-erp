@@ -34,8 +34,8 @@ jobs:
             export PATH="$HOME/.local/bin/bin:$PATH"
             cd /home/ubuntu/data/projets/amd_web_app
             
-            # Instalar dependencias
-            pnpm install --no-frozen-lockfile
+            # Instalar dependencias (sin prompts interactivos)
+            pnpm install --no-frozen-lockfile --config.confirmModulesPurge=false
             
             # Levantar base de datos (PostgreSQL + Redis + MinIO)
             sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
