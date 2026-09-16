@@ -53,3 +53,4 @@ Toda la documentación vive en `docs/` en formato Markdown, lista para visualiza
 ## 📄 Licencia
 
 Privado — AMD México © 2025
+
