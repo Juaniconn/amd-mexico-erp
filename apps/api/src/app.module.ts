@@ -10,6 +10,7 @@ import { CalidadModule } from './modules/calidad/calidad.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { ComprasModule } from './modules/compras/compras.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
+import { VentasModule } from './modules/ventas/ventas.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     InventarioModule,
     ComprasModule,
     ReportesModule,
+    VentasModule,
   ],
 })
 export class AppModule {}
