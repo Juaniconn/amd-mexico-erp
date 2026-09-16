@@ -55,7 +55,7 @@ jobs:
             
             # Generar cliente Prisma y ejecutar migraciones
             pnpm --filter @amd/api prisma:generate
-            pnpm --filter @amd/api prisma:migrate
+            pnpm --filter @amd/api exec prisma migrate deploy
             
             # Seed de datos iniciales
             pnpm --filter @amd/api prisma:seed
