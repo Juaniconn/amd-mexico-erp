@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
+import { Reflector } from '@nestjs/core';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +23,13 @@ async function bootstrap() {
     origin: process.env.APP_URL || 'http://localhost:3000',
     credentials: true,
   });
+
+  // Global prefix for all API routes
+  app.setGlobalPrefix('api');
+
+  // Globalguards: JWT + Roles
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
 
   // Swagger / OpenAPI
   const config = new DocumentBuilder()
