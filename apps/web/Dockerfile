@@ -17,16 +17,11 @@ COPY packages/shared ./packages/shared/
 
 RUN pnpm --filter @amd/web build
 
-# Copy built output to a clean directory for production
-RUN mkdir -p /app/production && \
-    cp -r /app/apps/web/.next /app/production/.next && \
-    cp -r /app/apps/web/public /app/production/public 2>/dev/null || true && \
-    cp -r /app/apps/web/node_modules /app/production/node_modules && \
-    cp /app/apps/web/package.json /app/production/package.json && \
-    cp /app/apps/web/next.config.js /app/production/next.config.js 2>/dev/null || true
+WORKDIR /app/apps/web
 
-WORKDIR /app/production
+# Reinstall production dependencies in the web directory to get clean node_modules
+RUN pnpm install --prod --no-frozen-lockfile
 
 EXPOSE 3000
 
-CMD ["/app/production/node_modules/.bin/next", "start"]
+CMD ["node", "/app/apps/web/node_modules/next/dist/bin/next", "start"]
