@@ -21,9 +21,6 @@ COPY packages/shared ./packages/shared/
 # Build
 RUN pnpm --filter @amd/web build
 
-# Production dependencies only
-RUN pnpm install --omit=dev --no-frozen-lockfile
-
 WORKDIR /app/apps/web
 
 RUN addgroup -S erp && adduser -S erp -G erp
