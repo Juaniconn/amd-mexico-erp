@@ -35,8 +35,13 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
 
-# Generate Prisma client at build time
-RUN npx prisma generate
+# Production dependencies and built output
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/apps/api/prisma ./prisma
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
 # Create non-root user
 RUN addgroup -S erp && adduser -S erp -G erp
@@ -47,4 +52,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
 
-CMD ["node", "dist/main.js"]
+CMD ["./docker-entrypoint.sh"]

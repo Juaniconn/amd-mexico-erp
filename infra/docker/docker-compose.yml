@@ -63,8 +63,8 @@ services:
   # ─── Backend API (NestJS) ────────────────────────────────
   api:
     build:
-      context: ../../apps/api
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/api/Dockerfile
     container_name: amd-erp-api
     restart: unless-stopped
     environment:
@@ -93,8 +93,8 @@ services:
   # ─── Frontend (Next.js) ──────────────────────────────────
   web:
     build:
-      context: ../../apps/web
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/web/Dockerfile
     container_name: amd-erp-web
     restart: unless-stopped
     environment:
