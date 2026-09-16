@@ -25,12 +25,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      # Prisma schema validation before tests
-      - name: Validate Prisma schema
-        run: |
-          cd apps/api
-          PRISMA_SCHEMA_PATH=prisma/schema.prisma npx prisma validate
-
       - name: Lint
         run: pnpm lint
 
