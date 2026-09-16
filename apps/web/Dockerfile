@@ -5,16 +5,16 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copiar workspace completo
+# Copy workspace files
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/shared/package.json ./packages/shared/
 
-# Instalar dependencias
+# Install dependencies
 RUN pnpm install --no-frozen-lockfile
 
-# Copiar código fuente
+# Copy source
 COPY apps/web ./apps/web/
 COPY packages/ui ./packages/ui/
 COPY packages/shared ./packages/shared/
@@ -27,23 +27,13 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-RUN npm install -g pnpm
-
-# Copiar workspace
-COPY package.json pnpm-workspace.yaml ./
-COPY apps/web/package.json ./apps/web/
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/shared/package.json ./packages/shared/
-
-# Production dependencies only
-RUN pnpm install --omit=dev --no-frozen-lockfile
+# Copy production dependencies from builder
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built app
 COPY --from=builder /app/apps/web/.next ./.next
-COPY --from=builder /app/apps/web/package.json ./
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/next.config.js ./
-COPY --from=builder /app/apps/web/tsconfig.json ./
 
 RUN addgroup -S erp && adduser -S erp -G erp
 USER erp
