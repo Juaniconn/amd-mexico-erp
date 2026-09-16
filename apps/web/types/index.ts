@@ -193,3 +193,69 @@ export interface Material {
   activo: boolean;
   createdAt: string;
 }
+
+// ─── CRM ─────────────────────────────────────────────────
+
+export interface ActividadLead {
+  id: string;
+  leadId: string;
+  tipo: 'NOTA' | 'LLAMADA' | 'EMAIL' | 'REUNION' | 'TAREA';
+  descripcion: string;
+  userId?: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InteresLead {
+  id: string;
+  leadId: string;
+  descripcion: string;
+  cantidad?: number;
+  notas?: string;
+  createdAt: string;
+}
+
+export interface Lead {
+  id: string;
+  folio: string;
+  nombre: string;
+  contactoNombre?: string;
+  email?: string;
+  telefono?: string;
+  origen: 'REFERENCIA' | 'WEB' | 'LLAMADA' | 'EMAIL' | 'FERIA' | 'OTRO';
+  estatus: 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PROPUESTA' | 'GANADO' | 'PERDIDO';
+  valorEstimado?: number | string | null;
+  moneda: 'MXN' | 'USD';
+  tipoCambio?: number | string | null;
+  descripcion?: string;
+  notas?: string;
+  fechaSeguimiento?: string;
+  proximaAccion?: string;
+  vendedorId?: string;
+  vendedor?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+  clienteId?: string;
+  cliente?: Cliente;
+  actividades?: ActividadLead[];
+  intereses?: InteresLead[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadListResponse {
+  data: Lead[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}

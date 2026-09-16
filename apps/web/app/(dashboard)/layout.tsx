@@ -76,6 +76,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavLink href="/dashboard/compras">Compras</NavLink>
           <NavLink href="/dashboard/calidad">Calidad</NavLink>
           <NavLink href="/dashboard/reportes">Reportes</NavLink>
+          <NavLink href="/dashboard/crm">CRM</NavLink>
         </nav>
 
         <div className="p-4 border-t border-slate-700">
