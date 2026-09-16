@@ -18,4 +18,4 @@ RUN pnpm --filter @amd/api build
 
 EXPOSE 3001
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/api/dist/main.js"]
