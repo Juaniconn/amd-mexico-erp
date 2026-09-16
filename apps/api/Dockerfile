@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-bookworm
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ RUN pnpm --filter @amd/api exec prisma generate
 WORKDIR /app/apps/api
 
 # Create non-root user
-RUN addgroup -S erp && adduser -S erp -G erp
+RUN addgroup --system erp && adduser --system --group erp
 USER erp
 
 EXPOSE 3001
