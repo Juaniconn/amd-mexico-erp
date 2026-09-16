@@ -35,7 +35,7 @@ jobs:
             cd /home/ubuntu/data/projets/amd_web_app
             
             # Instalar dependencias
-            pnpm install --no-frozen-lockfile
+            npx pnpm@9.15.4 install --no-frozen-lockfile
             
             # Levantar base de datos (PostgreSQL + Redis + MinIO)
             sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
