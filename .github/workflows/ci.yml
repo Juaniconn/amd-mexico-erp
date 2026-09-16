@@ -23,7 +23,7 @@ jobs:
         run: npm install -g pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile --allow-build=@nestjs/core,@nestjs/schematics,@prisma/client,@prisma/engines,prisma,unrs-resolver
+        run: pnpm install --no-frozen-lockfile
 
       - name: Lint
         run: pnpm lint
