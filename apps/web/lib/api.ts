@@ -1,31 +1,65 @@
-import { User } from '../types';
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export async function login(email: string, password: string): Promise<{ user: User; accessToken: string }> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
+class ApiError extends Error {
+  status: number;
+  data: any;
+
+  constructor(status: number, data: any) {
+    super(data?.message || 'Error de API');
+    this.status = status;
+    this.data = data;
+  }
+}
+
+async function apiClient<T = any>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_URL}${path}`;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data);
+  }
+
+  return res.json();
+}
+
+export function get<T = any>(path: string): Promise<T> {
+  return apiClient<T>(path, { method: 'GET' });
+}
+
+export function post<T = any>(path: string, body?: any): Promise<T> {
+  return apiClient<T>(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
-
-  if (!response.ok) {
-    throw new Error('Invalid credentials');
-  }
-
-  return response.json();
 }
 
-export async function getUserProfile(accessToken: string): Promise<User> {
-  const response = await fetch(`${API_URL}/api/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+export function put<T = any>(path: string, body?: any): Promise<T> {
+  return apiClient<T>(path, {
+    method: 'PUT',
+    body: JSON.stringify(body),
   });
-
-  if (!response.ok) {
-    throw new Error('Unauthorized');
-  }
-
-  return response.json();
 }
+
+export function del<T = any>(path: string): Promise<T> {
+  return apiClient<T>(path, { method: 'DELETE' });
+}
+
+export { ApiError, API_URL };
