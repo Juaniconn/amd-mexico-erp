@@ -19,4 +19,5 @@ RUN pnpm --filter @amd/web build
 
 EXPOSE 3000
 
-CMD ["node_modules/.bin/next", "start"]
+# next is installed at the workspace root node_modules
+CMD ["/app/node_modules/.bin/next", "start"]
