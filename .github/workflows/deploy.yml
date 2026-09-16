@@ -34,21 +34,31 @@ jobs:
             export PATH="$HOME/.local/bin:$PATH"
             cd /home/ubuntu/data/projets/amd_web_app
             
-            # Instalar dependencias con npm
-            npm install --legacy-peer-deps
+            # Instalar pnpm y dependencias
+            corepack enable
+            pnpm config set approve-builds true
+            pnpm install --no-frozen-lockfile
             
-            # Levantar infraestructura con imágenes locales (sin pull)
-            sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d --no-pull db redis minio"
+            # Descargar imágenes (si no están locales), luego levantar
+            sg docker -c "docker compose -f infra/docker/docker-compose.yml pull --ignore-pull-failures" 2>&1 || true
+            sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
             
-            # Esperar a que la base de datos esté lista
-            sleep 10
+            # Esperar a que PostgreSQL esté listo
+            echo "Esperando a que PostgreSQL esté listo..."
+            for i in $(seq 1 30); do
+              if sg docker -c "docker compose -f infra/docker/docker-compose.yml exec db pg_isready -h localhost -p 5432 -U erp -d erp_db" > /dev/null 2>&1; then
+                echo "PostgreSQL listo"
+                break
+              fi
+              sleep 2
+            done
             
             # Generar cliente Prisma y ejecutar migraciones
-            npx prisma generate
-            npx prisma migrate deploy
+            pnpm --filter @amd/api prisma:generate
+            pnpm --filter @amd/api prisma:migrate
             
             # Seed de datos iniciales
-            npx prisma db seed
+            pnpm --filter @amd/api prisma:seed
             
             # Verificar contenedores corriendo
             sg docker -c "docker compose -f infra/docker/docker-compose.yml ps"
