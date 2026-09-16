@@ -5,13 +5,21 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
+# Copiar workspace completo
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/shared/package.json ./packages/shared/
 
+# Instalar dependencias
 RUN pnpm install --no-frozen-lockfile
 
+# Copiar código fuente
 COPY apps/web ./apps/web/
+COPY packages/ui ./packages/ui/
+COPY packages/shared ./packages/shared/
 
+# Build
 RUN pnpm --filter @amd/web build
 
 # ─── Stage 2: Production ─────────────────────────────────
@@ -21,11 +29,20 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-COPY --from=builder /app/node_modules ./node_modules
+# Copiar workspace
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/shared/package.json ./packages/shared/
+
+# Copiar build output
 COPY --from=builder /app/apps/web/.next ./.next
-COPY --from=builder /app/apps/web/package.json ./
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/next.config.js ./
+COPY --from=builder /app/apps/web/tsconfig.json ./
+
+# Copiar dependencias de producción
+COPY --from=builder /app/node_modules ./node_modules
 
 RUN addgroup -S erp && adduser -S erp -G erp
 USER erp
