@@ -34,9 +34,8 @@ jobs:
             export PATH="$HOME/.local/bin:$PATH"
             cd /home/ubuntu/data/projets/amd_web_app
             
-            # Instalar pnpm y dependencias
-            corepack enable
-            pnpm config set approve-builds true
+            # Instalar dependencias
+            export PATH="$HOME/.local/bin:$PATH"
             pnpm install --no-frozen-lockfile
             
             # Descargar imágenes (si no están locales), luego levantar
