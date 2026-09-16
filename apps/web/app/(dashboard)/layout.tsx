@@ -73,6 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavLink href="/dashboard/produccion">Producción</NavLink>
           <NavLink href="/dashboard/inventario">Inventario</NavLink>
           <NavLink href="/dashboard/compras">Compras</NavLink>
+          <NavLink href="/dashboard/calidad">Calidad</NavLink>
           <NavLink href="/dashboard/reportes">Reportes</NavLink>
         </nav>
 
