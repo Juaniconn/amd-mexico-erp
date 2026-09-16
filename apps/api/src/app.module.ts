@@ -27,6 +27,7 @@ import { ReportesModule } from './modules/reportes/reportes.module';
     InventarioModule,
     ComprasModule,
     ReportesModule,
+    ProveedoresModule,
   ],
 })
 export class AppModule {}
