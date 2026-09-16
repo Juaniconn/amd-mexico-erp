@@ -21,6 +21,9 @@ COPY packages/shared ./packages/shared/
 # Build
 RUN pnpm --filter @amd/api build
 
+# Generate Prisma client
+RUN pnpm --filter @amd/api exec prisma generate
+
 # ─── Stage 2: Production ─────────────────────────────────
 FROM node:20-alpine AS production
 
@@ -40,7 +43,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
-COPY docker-entrypoint.sh ./
+COPY --from=builder /app/apps/api/docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
 # Create non-root user
