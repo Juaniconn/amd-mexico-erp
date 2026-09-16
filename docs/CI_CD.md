@@ -5,8 +5,20 @@
 Pipeline de CI/CD que se ejecuta en cada push a `main`:
 
 ```
-Push a main → [CI: Lint + Build + Test] → [Deploy: Build Docker + Up services]
+Push a main → [CI: Lint + Build + Test] → [Deploy: Infraestructura + DB]
 ```
+
+## Stack de CI/CD
+
+| Componente | Versión |
+|------------|---------|
+| GitHub Actions | ubuntu-latest (Node 24) |
+| pnpm | 9.15.4 (instalado vía npm en CI, servidor usa standalone) |
+| Docker | 29.8.1 |
+| Docker Compose | v5.5.1 |
+
+### Nota sobre pnpm
+El workflow CI usa `npm install -g pnpm@9.15.4` (funciona correctamente con `approve-builds=true` en `.npmrc`). El servidor usa pnpm 12 standalone con configuración en `pnpm-workspace.yaml`. Si el servidor actualiza pnpm, recordar que pnpm 12 ignora `approve-builds` y usa `onlyBuiltDependencies` en el workspace config.
 
 ## Configuración Inicial (una vez)
 
@@ -40,31 +52,36 @@ cat ~/.ssh/github_actions
 
 ### CI (Continuous Integration)
 - **Trigger**: push/PR a `main`
-- **Acciones**: lint → build → test
+- **Acciones**: install pnpm 9 → install deps → lint → build → test
 
 ### Deploy (Continuous Deployment)
 - **Trigger**: push a `main` o merge de PR
 - **Acciones**:
-  1. `git pull` en el servidor
-  2. `pnpm install`
-  3. `docker compose build`
-  4. Backup pre-deploy
-  5. `docker compose up -d`
+  1. SSH al servidor
+  2. Verificar/instalar pnpm
+  3. `git pull`
+  4. `pnpm install`
+  5. Levantar DB con Docker
+  6. Prisma migrate + seed
 
 ## Diagrama de Flujo
 
 ```
-┌──────────────┐     ┌───────────┐     ┌──────────────┐
-│ Push to main │────▶│ CI Checks │────▶│ Deploy Stage │
-│              │     │           │     │              │
-│              │     │ • Lint    │     │ • Git pull   │
-│              │     │ • Build   │     │ • Build imgs │
-│              │     │ • Test    │     │ • DB backup  │
-│              │     └───────────┘     │ • Docker up  │
-└──────────────┘                       └──────────────┘
+┌──────────────┐     ┌───────────────┐     ┌──────────────┐
+│ Push to main │────▶│ CI (GitHub)   │────▶│ Deploy (SSH) │
+│              │     │               │     │              │
+│              │     │ pnpm install │     │ git pull     │
+│              │     │ lint          │     │ pnpm install │
+│              │     │ build         │     │ docker up db │
+│              │     │ test          │     │ prisma cmd   │
+└──────────────┘     └───────────────┘     └──────────────┘
 ```
 
 ## Troubleshooting
+
+### `ERR_PNPM_IGNORED_BUILDS`
+- **CI**: El workflow ya usa pnpm 9.15.4. Si persiste, revisar que `.npmrc` tenga `approve-builds=true`
+- **Deploy**: El servidor usa pnpm 12 standalone que ignora esta config. Resolver corriendo `pnpm approve-builds` localmente o usar `npx pnpm@9`
 
 ### El deploy falla por SSH
 - Verificar que la llave privada sea la misma que la pública
