@@ -1,10 +1,10 @@
-FROM node:20-alpine
+FROM node:20-bookworm
 
 WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy workspace
+# Copy workspace files
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/ui/package.json ./packages/ui/
@@ -23,7 +23,7 @@ RUN pnpm --filter @amd/web build
 
 WORKDIR /app/apps/web
 
-RUN addgroup -S erp && adduser -S erp -G erp
+RUN addgroup --system erp && adduser --system --group erp
 USER erp
 
 EXPOSE 3000
