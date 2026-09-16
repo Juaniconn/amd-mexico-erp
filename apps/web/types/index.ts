@@ -59,12 +59,49 @@ export interface Cotizacion {
   createdAt: string;
 }
 
+export interface Proveedor {
+  id: string;
+  codigo: string;
+  razonSocial: string;
+  rfc?: string;
+  contacto?: string;
+  email?: string;
+  telefono?: string;
+  direccion?: string;
+  ciudad?: string;
+  estado?: string;
+  codigoPostal?: string;
+  pais?: string;
+  creditoLimite?: number | string;
+  diasCredito?: number;
+  monedaPref?: string;
+  notas?: string;
+  activo?: boolean;
+  estatus?: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    ordenesCompraProveedor: number;
+  };
+}
+
+export interface OrdenCompraProveedor {
+  id: string;
+  proveedorId: string;
+  proveedorNombre?: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+  notas?: string;
+}
+
 export interface OrdenCompra {
   id: string;
   folio: string;
   cotizacionId?: string;
   clienteId: string;
   sucursalId?: string;
+  razonSocial?: string;
   fecha: string;
   fechaEntrega?: string;
   moneda: string;
@@ -72,6 +109,9 @@ export interface OrdenCompra {
   iva: number;
   total: number;
   estatus: string;
+  condicionesPago?: string;
+  notas?: string;
+  proveedores?: OrdenCompraProveedor[];
   createdAt: string;
 }
 
