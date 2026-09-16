@@ -34,16 +34,16 @@ jobs:
             export PATH="$HOME/.local/bin/bin:$PATH"
             cd /home/ubuntu/data/projets/amd_web_app
             
-            # Instalar pnpm si no está disponible
-            if ! command -v pnpm &> /dev/null; then
+            # Instalar pnpm 9.15.4 si no está o si es v12+
+            if ! command -v pnpm &> /dev/null || pnpm --version | grep -q "^12"; then
               curl -fsSL https://get.pnpm.io/install.sh | env PNPM_HOME="$HOME/.local/bin" sh -
               export PATH="$HOME/.local/bin:$PATH"
             fi
             
             git pull origin main
             
-            # Instalar dependencias
-            pnpm install --no-frozen-lockfile
+            # Instalar dependencias con pnpm 9
+            pnpm@9 install --no-frozen-lockfile
             
             # Levantar base de datos (PostgreSQL + Redis + MinIO)
             sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
