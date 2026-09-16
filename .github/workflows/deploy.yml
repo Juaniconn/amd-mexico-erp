@@ -33,6 +33,13 @@ jobs:
             set -e
             export PATH="$HOME/.local/bin/bin:$PATH"
             cd /home/ubuntu/data/projets/amd_web_app
+            
+            # Instalar pnpm si no está disponible
+            if ! command -v pnpm &> /dev/null; then
+              curl -fsSL https://get.pnpm.io/install.sh | env PNPM_HOME="$HOME/.local/bin" sh -
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
+            
             git pull origin main
             
             # Instalar dependencias
