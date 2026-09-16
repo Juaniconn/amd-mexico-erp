@@ -53,12 +53,12 @@ jobs:
               sleep 2
             done
             
-            # Generar cliente Prisma y ejecutar migraciones
-            pnpm --filter @amd/api prisma:generate
-            pnpm --filter @amd/api exec prisma migrate deploy
+            # Generar cliente Prisma y ejecutar migraciones (usando npx para evitar PATH issues)
+            npx prisma generate --schema apps/api/prisma/schema.prisma
+            npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
             
             # Seed de datos iniciales
-            pnpm --filter @amd/api prisma:seed
+            npx prisma db seed --schema apps/api/prisma/schema.prisma
             
             # Verificar contenedores corriendo
             sg docker -c "docker compose -f infra/docker/docker-compose.yml ps"
