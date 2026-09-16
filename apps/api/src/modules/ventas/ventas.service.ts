@@ -6,7 +6,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateVentaDto, UpdateVentaDto } from './dto/create-venta.dto';
+import { CreateVentaDto } from './dto/create-venta.dto';
+import { UpdateVentaDto } from './dto/update-venta.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -50,6 +51,7 @@ export class VentasService {
           iva: new Prisma.Decimal(iva),
           total: new Prisma.Decimal(total),
           estatus: 'COTIZACION' as any,
+          condicionesPago: data.condicionesPago,
           notas: data.notas,
           items: {
             create: data.items.map((d) => ({
@@ -214,6 +216,7 @@ export class VentasService {
       if (data.fechaEntrega)
         updateData.fechaEntrega = new Date(data.fechaEntrega);
       if (data.notas !== undefined) updateData.notas = data.notas;
+      if (data.condicionesPago !== undefined) updateData.condicionesPago = data.condicionesPago;
       if (data.estatus) updateData.estatus = data.estatus as any;
 
       const venta = await this.prisma.venta.update({

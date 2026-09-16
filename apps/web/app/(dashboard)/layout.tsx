@@ -70,6 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavLink href="/dashboard">Dashboard</NavLink>
           <NavLink href="/dashboard/clientes">Clientes</NavLink>
           <NavLink href="/dashboard/cotizaciones">Cotizaciones</NavLink>
+          <NavLink href="/dashboard/ventas">Ventas</NavLink>
           <NavLink href="/dashboard/produccion">Producción</NavLink>
           <NavLink href="/dashboard/inventario">Inventario</NavLink>
           <NavLink href="/dashboard/compras">Compras</NavLink>

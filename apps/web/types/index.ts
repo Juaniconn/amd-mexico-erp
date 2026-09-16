@@ -44,6 +44,71 @@ export interface Cliente {
   };
 }
 
+export interface Sucursal {
+  id: string;
+  codigo: string;
+  nombre: string;
+  ciudad?: string;
+  estado?: string;
+  pais?: string;
+  direccion?: string;
+  telefono?: string;
+  monedaDefault?: string;
+  esPrincipal?: boolean;
+  activo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VentaItem {
+  id?: string;
+  piezaNombre: string;
+  piezaDescripcion?: string;
+  cantidad: number;
+  unidad: string;
+  precioUnitario: number;
+  subtotal?: number;
+  tiempoEstimado?: number;
+  procesoRequerido?: string;
+  notas?: string;
+}
+
+export interface Venta {
+  id: string;
+  folio: string;
+  clienteId: string;
+  sucursalId?: string;
+  creadoPor?: string;
+  fecha: string;
+  fechaEntrega?: string;
+  moneda: 'MXN' | 'USD';
+  tipoCambio?: number | null;
+  subtotal: number;
+  iva: number;
+  total: number;
+  estatus: string;
+  condicionesPago?: string;
+  notas?: string;
+  cliente?: Cliente;
+  sucursal?: Sucursal;
+  items?: VentaItem[];
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    items: number;
+  };
+}
+
+export interface VentaListResponse {
+  data: Venta[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 export interface Cotizacion {
   id: string;
   folio: string;

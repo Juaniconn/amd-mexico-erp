@@ -73,6 +73,10 @@ export class CreateVentaDto {
 
   @IsString()
   @IsOptional()
+  condicionesPago?: string;
+
+  @IsString()
+  @IsOptional()
   notas?: string;
 
   @IsArray()

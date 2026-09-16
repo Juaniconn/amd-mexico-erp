@@ -72,6 +72,10 @@ export class UpdateVentaDto {
 
   @IsString()
   @IsOptional()
+  condicionesPago?: string;
+
+  @IsString()
+  @IsOptional()
   notas?: string;
 
   @IsString()
