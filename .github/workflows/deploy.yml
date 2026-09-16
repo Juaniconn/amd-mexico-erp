@@ -37,8 +37,8 @@ jobs:
             # Instalar dependencias con npm
             npm install --legacy-peer-deps
             
-            # Levantar base de datos (PostgreSQL + Redis + MinIO)
-            sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
+            # Levantar infraestructura con imágenes locales (sin pull)
+            sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d --no-pull db redis minio"
             
             # Esperar a que la base de datos esté lista
             sleep 10
