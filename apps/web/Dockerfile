@@ -1,11 +1,10 @@
-# ─── Stage 1: Build ──────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy workspace files
+# Copy workspace
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/ui/package.json ./packages/ui/
@@ -22,18 +21,10 @@ COPY packages/shared ./packages/shared/
 # Build
 RUN pnpm --filter @amd/web build
 
-# ─── Stage 2: Production ─────────────────────────────────
-FROM node:20-alpine AS production
+# Production dependencies only
+RUN pnpm install --omit=dev --no-frozen-lockfile
 
-WORKDIR /app
-
-# Copy production dependencies from builder
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy built app
-COPY --from=builder /app/apps/web/.next ./.next
-COPY --from=builder /app/apps/web/public ./public
-COPY --from=builder /app/apps/web/next.config.js ./
+WORKDIR /app/apps/web
 
 RUN addgroup -S erp && adduser -S erp -G erp
 USER erp
