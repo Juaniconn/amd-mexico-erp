@@ -2,11 +2,9 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# pnpm 10+ requires explicit approval of build scripts
+# pnpm 9+ explicit build approval
 onlyBuiltDependencies:
   - '@nestjs/core'
-  - '@nestjs/schematics'
+  - 'prisma'
   - '@prisma/client'
   - '@prisma/engines'
-  - prisma
-  - unrs-resolver
