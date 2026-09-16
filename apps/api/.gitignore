@@ -1,0 +1,32 @@
+# Prisma
+prisma/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.*.local
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Temp
+*.tmp
+*.swp

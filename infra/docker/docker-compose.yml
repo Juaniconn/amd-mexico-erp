@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL ──────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: amd-erp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-erp_db}
+      TZ: America/Mexico_City
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-erp} -d ${POSTGRES_DB:-erp_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: amd-erp-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO (S3-compatible storage) ───────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: amd-erp-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend API (NestJS) ────────────────────────────────
+  api:
+    build:
+      context: ../../apps/api
+      dockerfile: Dockerfile
+    container_name: amd-erp-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-erp}:${POSTGRES_PASSWORD:-erp_password}@db:5432/${POSTGRES_DB:-erp_db}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      JWT_SECRET: ${JWT_SECRET:-cambiar-por-un-secret-secto-de-64-caracteres}
+      JWT_EXPIRES_IN: 8h
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-cambiar-por-otro-secret-secto-de-64-caracteres}
+      JWT_REFRESH_EXPIRES_IN: 7d
+      NODE_ENV: production
+      API_PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ─── Frontend (Next.js) ──────────────────────────────────
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+    container_name: amd-erp-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:3001
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

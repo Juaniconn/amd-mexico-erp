@@ -1,0 +1,21 @@
+{
+  "name": "amd-web-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERP de manufactura — AMD México (Ciudad Juárez, Guadalajara, El Paso TX)",
+  "scripts": {
+    "dev": "pnpm --filter api dev & pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter api build && pnpm --filter web build",
+    "db:generate": "pnpm --filter api prisma generate",
+    "db:migrate": "pnpm --filter api prisma migrate dev",
+    "db:seed": "pnpm --filter api prisma db seed",
+    "db:studio": "pnpm --filter api prisma studio",
+    "lint": "pnpm --filter api lint && pnpm --filter web lint",
+    "test": "pnpm --filter api test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,44 @@
+name: Deploy AMD ERP
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /data/projets/amd_web_app
+            git pull origin main
+            
+            # Instalar dependencias
+            pnpm install
+            
+            # Build de imágenes
+            docker compose -f infra/docker/docker-compose.yml build
+            
+            # Backup antes de desplegar
+            docker exec amd-erp-db pg_dump -U erp erp_db | gzip > /data/backups/daily/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz
+            
+            # Reiniciar servicios
+            docker compose -f infra/docker/docker-compose.yml up -d
+            
+            # Limpiar imágenes antiguas
+            docker image prune -f
+          EOF
