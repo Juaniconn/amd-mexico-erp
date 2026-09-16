@@ -40,11 +40,21 @@ jobs:
             # Instalar dependencias
             pnpm install --no-frozen-lockfile
             
-            # Reiniciar servicios (sin docker build por ahora)
-            docker compose -f infra/docker/docker-compose.yml up -d --force-recreate
+            # Levantar base de datos (PostgreSQL + Redis + MinIO)
+            sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
             
-            # Limpiar imágenes antiguas
-            docker image prune -f
+            # Esperar a que la base de datos esté lista
+            sleep 10
+            
+            # Generar cliente Prisma y ejecutar migraciones
+            npx prisma generate
+            npx prisma migrate deploy
+            
+            # Seed de datos iniciales
+            npx prisma db seed
+            
+            # Verificar contenedores corriendo
+            sg docker -c "docker compose -f infra/docker/docker-compose.yml ps"
             
             echo "Deploy OK"
           EOF
