@@ -36,7 +36,7 @@ jobs:
             git pull origin main
             
             # Instalar dependencias
-            pnpm install --no-frozen-lockfile
+            pnpm install --no-frozen-lockfile --allow-build=@nestjs/core,@nestjs/schematics,@prisma/client,@prisma/engines,prisma,unrs-resolver
             
             # Levantar base de datos (PostgreSQL + Redis + MinIO)
             sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
