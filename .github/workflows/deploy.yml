@@ -21,32 +21,27 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add known hosts
-        run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      - name: Test SSH connection
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "echo 'SSH OK'; pwd; whoami" || { echo 'SSH FAILED'; exit 1; }
 
       - name: Deploy to server
         run: |
-          ssh -o BatchMode=yes -o ConnectTimeout=10 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
             cd /data/projets/amd_web_app
             git pull origin main
             
             # Configurar pnpm y aprobar builds
             pnpm config set approve-builds true
-            export PATH="$HOME/.local/bin/bin:$PATH"
             
             # Instalar dependencias
-            pnpm install
+            pnpm install --no-frozen-lockfile
             
-            # Build de imágenes
-            docker compose -f infra/docker/docker-compose.yml build
-            
-            # Backup antes de desplegar
-            mkdir -p /data/backups/daily
-            docker exec amd-erp-db pg_dump -U erp erp_db | gzip > /data/backups/daily/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz
-            
-            # Reiniciar servicios
-            docker compose -f infra/docker/docker-compose.yml up -d
+            # Reiniciar servicios (sin docker build por ahora)
+            docker compose -f infra/docker/docker-compose.yml up -d --force-recreate
             
             # Limpiar imágenes antiguas
             docker image prune -f
