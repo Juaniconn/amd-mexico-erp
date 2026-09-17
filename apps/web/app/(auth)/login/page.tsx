@@ -34,7 +34,9 @@ export default function Login() {
       }
 
       const data = await res.json();
-      // Token is already stored in cookies by the Next.js proxy
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
       window.location.href = '/';
     } catch (err) {
       console.error('Login error:', err);
