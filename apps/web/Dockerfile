@@ -16,8 +16,8 @@ COPY packages/ui ./packages/ui
 COPY packages/shared ./packages/shared
 
 # Use relative /api URL so browser calls go through nginx reverse proxy
-# Empty by default — callers provide /api/xxx paths and the browser resolves them same-origin
-ENV NEXT_PUBLIC_API_URL=
+# Use relative /api URL so browser calls go through nginx reverse proxy
+ENV NEXT_PUBLIC_API_URL=/api
 
 RUN pnpm --filter @amd/web build
 
