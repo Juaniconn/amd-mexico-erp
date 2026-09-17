@@ -32,7 +32,7 @@ export class CalidadService {
 
   async findAll(page: number = 1, limit: number = 10, search?: string, resultado?: string) {
     const skip = (page - 1) * limit;
-    const where: Prisma.ControlCalidadWhereInput = {
+    const where: any = {
       ...(resultado ? { resultado: resultado as any } : {}),
       ...(search
         ? {
@@ -82,7 +82,7 @@ export class CalidadService {
 
   async update(id: string, data: UpdateControlCalidadDto) {
     try {
-      const updateData: Prisma.ControlCalidadUpdateInput = {};
+      const updateData: any = {};
       if (data.resultado) updateData.resultado = data.resultado as any;
       if (data.defectos !== undefined) updateData.defectos = data.defectos;
       if (data.observaciones !== undefined) updateData.observaciones = data.observaciones;
