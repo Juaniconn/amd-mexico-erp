@@ -26,7 +26,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Generate Prisma client
-        run: cd apps/api && npx prisma generate
+        run: cd apps/api && pnpm exec prisma generate
 
       - name: Lint
         run: pnpm lint
