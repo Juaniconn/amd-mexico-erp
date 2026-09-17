@@ -25,6 +25,17 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for token in URL (from login redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    
+    if (urlToken) {
+      // Save token from URL to localStorage
+      localStorage.setItem('accessToken', urlToken);
+      // Clean URL
+      window.history.replaceState({}, '', '/');
+    }
+
     const token = localStorage.getItem('accessToken');
     const storedUser = localStorage.getItem('user');
     

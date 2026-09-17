@@ -20,20 +20,22 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || `Error ${res.status}: ${res.statusText}`);
+        setError(data.message || `Error ${res.status}`);
         return;
       }
 
-      const data = await res.json();
+      // Store tokens in localStorage AND redirect with token in URL
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
-      window.location.href = '/';
+      
+      // Also pass token via URL param for mobile reliability
+      window.location.href = `/?token=${encodeURIComponent(data.accessToken)}`;
     } catch (err) {
-      console.error('Login error:', err);
-      setError('Error de conexión con el servidor. Verifica tu conexión.');
+      setError('Error de conexión con el servidor');
     } finally {
       setLoading(false);
     }
