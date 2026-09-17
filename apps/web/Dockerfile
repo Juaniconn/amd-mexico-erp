@@ -17,7 +17,7 @@ COPY packages/shared ./packages/shared
 
 # Use relative /api URL so browser calls go through nginx reverse proxy
 # Use relative /api URL so browser calls go through nginx reverse proxy
-ENV NEXT_PUBLIC_API_URL=http://api:3001
+ENV NEXT_PUBLIC_API_URL=http://amd-erp-api:3001
 
 RUN pnpm --filter @amd/web build
 

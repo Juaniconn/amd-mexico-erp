@@ -87,7 +87,7 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - erp-network
+      - default
 
   web:
     build:
