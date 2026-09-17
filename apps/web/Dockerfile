@@ -11,9 +11,12 @@ COPY packages/shared/package.json ./packages/shared/
 
 RUN pnpm install --no-frozen-lockfile
 
-COPY apps/web ./apps/web/
-COPY packages/ui ./packages/ui/
-COPY packages/shared ./packages/shared/
+COPY apps/web ./apps/web
+COPY packages/ui ./packages/ui
+COPY packages/shared ./packages/shared
+
+# Use relative /api URL so browser calls go through nginx reverse proxy
+ENV NEXT_PUBLIC_API_URL=/api
 
 RUN pnpm --filter @amd/web build
 
