@@ -421,6 +421,7 @@ if check_auth && [[ -n "$OPERACION_ID" ]]; then
   CALIDAD_BODY=$(cat <<EOF
 {
   "operacionId": "${OPERACION_ID}",
+  "ordenTrabajoId": "${RESOURCES["Crear Orden Trabajo"]:-}",
   "resultado": "APROBADO",
   "defectos": "",
   "observaciones": "Inspeccion de calidad aprobada en test e2e ${TEST_CODE}"
