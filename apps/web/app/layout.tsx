@@ -1,10 +1,15 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AMD México ERP',
-  description: 'Sistema de Gestión Industrial - Manufactura',
+  title: 'AMD Operations',
+  description: 'Plataforma operativa interna de AMD México',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0b0d12',
 };
 
 export default function RootLayout({
@@ -16,16 +21,5 @@ export default function RootLayout({
     <html lang="es">
       <body>{children}</body>
     </html>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="block rounded-lg px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
-    >
-      {children}
-    </Link>
   );
 }
