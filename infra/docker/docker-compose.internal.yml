@@ -96,7 +96,6 @@ services:
     container_name: amd-erp-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: /api
       NODE_ENV: production
     ports:
       - "127.0.0.1:3000:3000"
