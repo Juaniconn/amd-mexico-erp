@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { get } from '@/lib/api';
@@ -22,29 +22,43 @@ interface User {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    // Only run on client side (after mount)
     const token = localStorage.getItem('accessToken');
-    if (!storedUser || !token) {
+    const storedUser = localStorage.getItem('user');
+    
+    if (!token || !storedUser) {
       router.push('/login');
       return;
     }
 
     get<User>('/api/auth/me')
       .then((u) => setUser(u))
-      .catch((err) => {
+      .catch(() => {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         router.push('/login');
-      });
+      })
+      .finally(() => setLoading(false));
   }, [router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-900">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900">
-        <p className="text-white">Cargando...</p>
+        <div className="text-center">
+          <p className="text-white mb-4">Sesión expirada. Redirigiendo al login...</p>
+        </div>
       </div>
     );
   }
