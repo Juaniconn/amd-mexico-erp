@@ -9,8 +9,6 @@ import {
   Factory,
   CheckCircle,
   BarChart3,
-  CreditCard,
-  Layers,
   Zap,
   Moon,
   Sun,
@@ -31,8 +29,6 @@ const modules = [
   { section: 'Operaciones', items: [
     { href: '/clientes', icon: Users, label: 'Clientes' },
     { href: '/cotizaciones', icon: FileText, label: 'Cotizaciones' },
-    { href: '/ventas', icon: CreditCard, label: 'Ventas' },
-    { href: '/crm', icon: Layers, label: 'CRM' },
   ]},
   { section: 'Producción', items: [
     { href: '/produccion', icon: Hammer, label: 'Producción' },

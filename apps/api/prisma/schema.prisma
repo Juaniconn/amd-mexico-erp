@@ -85,6 +85,16 @@ enum Prioridad {
   URGENTE
 }
 
+enum EnumIngenieriaEstatus {
+  PENDIENTE_PLANOS
+  EN_DISENO
+  LISTO_COTIZAR
+  COTIZADO
+  EN_PRODUCCION
+  LIBERADO
+  OBSOLETO
+}
+
 // ─── Usuarios y Auth ─────────────────────────────────────
 
 model Usuario {
@@ -113,6 +123,9 @@ model Usuario {
   inspecciones  ControlCalidad[] @relation("InspectorAuditor")
   leadsAsignados Lead[] @relation("LeadVendedor")
   actividadesCrm ActividadLead[] @relation("ActividadUsuario")
+  ingenieriaProyectosCreados IngenieriaProyecto[] @relation("IngenieriaCreador")
+  ingenieriaPlanosSubidos IngenieriaPlano[] @relation("PlanoSubidoPor")
+  ingenieriaProcesosOperador IngenieriaProceso[] @relation("ProcesoOperador")
 
   @@map("usuarios")
 }
@@ -143,6 +156,7 @@ model Sucursal {
   ventas        Venta[] @relation("SucursalVenta")
   transferenciasOrigen Transferencia[] @relation("TransferenciaOrigen")
   transferenciasDestino Transferencia[] @relation("TransferenciaDestino")
+  ingenieriaProyectos IngenieriaProyecto[]
 
   @@map("sucursales")
 }
@@ -175,6 +189,7 @@ model Cliente {
   ordenesCompra   OrdenCompra[]
   ventas          Venta[]
   leads           Lead[]
+  ingenieriaProyectos IngenieriaProyecto[]
 
   @@map("clientes")
 }
@@ -239,6 +254,7 @@ model Maquina {
   // Relaciones
   operaciones     Operacion[]
   partesOT        ParteOT[]
+  ingenieriaProcesos IngenieriaProceso[]
 
   @@map("maquinas")
 }
@@ -285,6 +301,7 @@ model Cotizacion {
   estatus         EstatusCotizacion @default(BORRADOR)
   notas           String?
   archivoPlanoId  String?  @map("archivo_plano_id")
+  ingenieriaProyectoId String? @map("ingenieria_proyecto_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -295,6 +312,7 @@ model Cotizacion {
   detalles         DetalleCotizacion[]
   ordenesCompra   OrdenCompra[]
   ordenesTrabajo  OrdenTrabajo[]
+  ingenieriaProyecto IngenieriaProyecto? @relation(fields: [ingenieriaProyectoId], references: [id])
 
   @@map("cotizaciones")
 }
@@ -472,6 +490,78 @@ model ControlCalidad {
   inspector        Usuario?     @relation("InspectorAuditor", fields: [inspectorId], references: [id])
 
   @@map("control_calidad")
+}
+
+// ─── Ingeniería / Diseño ─────────────────────────────────
+
+model IngenieriaProyecto {
+  id              String   @id @default(uuid())
+  codigo          String   @unique @map("codigo")
+  clienteId       String   @map("cliente_id")
+  sucursalId      String?  @map("sucursal_id")
+  nombre          String
+  descripcion     String?
+  status          EnumIngenieriaEstatus @default(PENDIENTE_PLANOS)
+  fechaInicio     DateTime? @map("fecha_inicio")
+  fechaEstimada   DateTime? @map("fecha_estimada")
+  creadoPor       String?  @map("creado_por")
+  notas           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  cliente         Cliente   @relation(fields: [clienteId], references: [id])
+  sucursal        Sucursal? @relation(fields: [sucursalId], references: [id])
+  creador         Usuario?  @relation("IngenieriaCreador", fields: [creadoPor], references: [id])
+  procesos        IngenieriaProceso[]
+  planos          IngenieriaPlano[]
+  cotizaciones    Cotizacion[]
+
+  @@map("ingenieria_proyectos")
+}
+
+model IngenieriaProceso {
+  id              String   @id @default(uuid())
+  proyectoId      String   @map("proyecto_id")
+  parteNumero     String   @map("parte_numero")
+  proceso         String
+  tiempoEstimado  Decimal? @map("tiempo_estimado") @db.Decimal(8, 2)
+  maquinaId       String?  @map("maquina_id")
+  operadorId      String?  @map("operador_id")
+  costoEstimado   Decimal? @map("costo_estimado") @db.Decimal(12, 2)
+  secuencia       Int      @default(0)
+  notas           String?
+  estatus         String   @default("PENDIENTE")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  proyecto        IngenieriaProyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  maquina         Maquina?  @relation(fields: [maquinaId], references: [id])
+  operador        Usuario?  @relation("ProcesoOperador", fields: [operadorId], references: [id])
+
+  @@map("ingenieria_procesos")
+}
+
+model IngenieriaPlano {
+  id              String   @id @default(uuid())
+  proyectoId      String   @map("proyecto_id")
+  parteNumero     String   @map("parte_numero")
+  version         Int      @default(1)
+  archivoUrl      String   @map("archivo_url")
+  uploadedAt      DateTime @default(now()) @map("uploaded_at")
+  uploadedBy      String?  @map("uploaded_by")
+  estatus         String   @default("ACTIVO")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  proyecto        IngenieriaProyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  uploadedByUser  Usuario?  @relation("PlanoSubidoPor", fields: [uploadedBy], references: [id])
+
+  @@map("ingenieria_planos")
+
+  @@unique([proyectoId, parteNumero, version])
 }
 
 // ─── Inventario de Materiales ────────────────────────────

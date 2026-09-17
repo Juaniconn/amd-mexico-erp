@@ -13,7 +13,6 @@ import {
   Package,
   Truck,
   Settings,
-  UserPlus,
   TrendingUp,
   TrendingDown,
   Plus,
@@ -40,7 +39,6 @@ interface StatData {
   materiales: number;
   proveedores: number;
   operaciones: number;
-  leadsCrm: number;
 }
 
 function DashboardContent() {
@@ -53,7 +51,6 @@ function DashboardContent() {
     materiales: 0,
     proveedores: 0,
     operaciones: 0,
-    leadsCrm: 0,
   });
   const [greeting, setGreeting] = useState('Buenos días');
 
@@ -76,9 +73,8 @@ function DashboardContent() {
       get<{ data: { meta: { total: number } } }>('/api/materiales?limit=1'),
       get<{ data: { meta: { total: number } } }>('/api/proveedores?limit=1'),
       get<{ data: { meta: { total: number } } }>('/api/operaciones?limit=1'),
-      get<{ data: { meta: { total: number } } }>('/api/crm/leads?limit=1'),
     ])
-      .then(([cli, cot, oc, ot, mat, prov, op, leads]) => {
+      .then(([cli, cot, oc, ot, mat, prov, op]) => {
         setStats({
           clientes: cli?.data?.meta?.total || 0,
           cotizaciones: cot?.data?.meta?.total || 0,
@@ -87,7 +83,6 @@ function DashboardContent() {
           materiales: mat?.data?.meta?.total || 0,
           proveedores: prov?.data?.meta?.total || 0,
           operaciones: op?.data?.meta?.total || 0,
-          leadsCrm: leads?.data?.meta?.total || 0,
         });
       })
       .catch(console.error);
@@ -101,7 +96,6 @@ function DashboardContent() {
     { key: 'materiales' as const, title: 'Materiales', icon: Package, trend: 0, color: 'text-brand' },
     { key: 'proveedores' as const, title: 'Proveedores', icon: Truck, trend: 2, color: 'text-accent-light' },
     { key: 'operaciones' as const, title: 'Operaciones', icon: Settings, trend: -1, color: 'text-success' },
-    { key: 'leadsCrm' as const, title: 'Leads CRM', icon: UserPlus, trend: 15, color: 'text-warning' },
   ];
 
   return (
@@ -195,7 +189,6 @@ function RecentActivityCard() {
     { icon: Package, color: 'text-brand bg-brand-muted', text: 'Orden de trabajo #892 completada', time: 'Hace 23 min' },
     { icon: Users, color: 'text-accent-light bg-accent-muted', text: 'Nuevo cliente registrado: TechCorp', time: 'Hace 1 hora' },
     { icon: ShoppingCart, color: 'text-warning bg-warning-muted', text: 'Orden de compra #567 creada', time: 'Hace 2 horas' },
-    { icon: UserPlus, color: 'text-accent-light bg-accent-muted', text: 'Lead CRM asignado a vendedor', time: 'Hace 3 horas' },
   ];
 
   return (

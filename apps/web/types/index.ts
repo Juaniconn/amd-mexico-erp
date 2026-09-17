@@ -60,55 +60,6 @@ export interface Sucursal {
   updatedAt?: string;
 }
 
-export interface VentaItem {
-  id?: string;
-  piezaNombre: string;
-  piezaDescripcion?: string;
-  cantidad: number;
-  unidad: string;
-  precioUnitario: number;
-  subtotal?: number;
-  tiempoEstimado?: number;
-  procesoRequerido?: string;
-  notas?: string;
-}
-
-export interface Venta {
-  id: string;
-  folio: string;
-  clienteId: string;
-  sucursalId?: string;
-  creadoPor?: string;
-  fecha: string;
-  fechaEntrega?: string;
-  moneda: 'MXN' | 'USD';
-  tipoCambio?: number | null;
-  subtotal: number;
-  iva: number;
-  total: number;
-  estatus: string;
-  condicionesPago?: string;
-  notas?: string;
-  cliente?: Cliente;
-  sucursal?: Sucursal;
-  items?: VentaItem[];
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    items: number;
-  };
-}
-
-export interface VentaListResponse {
-  data: Venta[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}
-
 export interface Cotizacion {
   id: string;
   folio: string;
@@ -192,72 +143,6 @@ export interface Material {
   moneda: string;
   activo: boolean;
   createdAt: string;
-}
-
-// ─── CRM ─────────────────────────────────────────────────
-
-export interface ActividadLead {
-  id: string;
-  leadId: string;
-  tipo: 'NOTA' | 'LLAMADA' | 'EMAIL' | 'REUNION' | 'TAREA';
-  descripcion: string;
-  userId?: string;
-  usuario?: {
-    id: string;
-    nombre: string;
-    apellido: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface InteresLead {
-  id: string;
-  leadId: string;
-  descripcion: string;
-  cantidad?: number;
-  notas?: string;
-  createdAt: string;
-}
-
-export interface Lead {
-  id: string;
-  folio: string;
-  nombre: string;
-  contactoNombre?: string;
-  email?: string;
-  telefono?: string;
-  origen: 'REFERENCIA' | 'WEB' | 'LLAMADA' | 'EMAIL' | 'FERIA' | 'OTRO';
-  estatus: 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PROPUESTA' | 'GANADO' | 'PERDIDO';
-  valorEstimado?: number | string | null;
-  moneda: 'MXN' | 'USD';
-  tipoCambio?: number | string | null;
-  descripcion?: string;
-  notas?: string;
-  fechaSeguimiento?: string;
-  proximaAccion?: string;
-  vendedorId?: string;
-  vendedor?: {
-    id: string;
-    nombre: string;
-    apellido: string;
-  };
-  clienteId?: string;
-  cliente?: Cliente;
-  actividades?: ActividadLead[];
-  intereses?: InteresLead[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface LeadListResponse {
-  data: Lead[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
 }
 
 // ─── Producción ──────────────────────────────────────────
@@ -352,4 +237,112 @@ export interface OrdenTrabajo {
     inspecciones: number;
     partes: number;
   };
+}
+
+// ─── Ingeniería / Diseño ─────────────────────────────────
+
+export type EnumIngenieriaEstatus =
+  | 'PENDIENTE_PLANOS'
+  | 'EN_DISENO'
+  | 'LISTO_COTIZAR'
+  | 'COTIZADO'
+  | 'EN_PRODUCCION'
+  | 'LIBERADO'
+  | 'OBSOLETO';
+
+export interface IngenieriaProceso {
+  id: string;
+  proyectoId: string;
+  parteNumero: string;
+  proceso: string;
+  tiempoEstimado?: number | null;
+  maquinaId?: string | null;
+  operadorId?: string | null;
+  costoEstimado?: number | null;
+  secuencia: number;
+  notas?: string | null;
+  estatus: string;
+  createdAt: string;
+  updatedAt: string;
+  maquina?: {
+    id: string;
+    codigo: string;
+    nombre: string;
+    tipo?: string;
+  };
+  operador?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+}
+
+export interface IngenieriaPlano {
+  id: string;
+  proyectoId: string;
+  parteNumero: string;
+  version: number;
+  archivoUrl: string;
+  uploadedAt: string;
+  uploadedBy?: string | null;
+  estatus: string;
+  createdAt: string;
+  updatedAt: string;
+  uploadedByUser?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+}
+
+export interface IngenieriaProyecto {
+  id: string;
+  codigo: string;
+  clienteId: string;
+  sucursalId?: string | null;
+  nombre: string;
+  descripcion?: string | null;
+  status: EnumIngenieriaEstatus;
+  fechaInicio?: string | null;
+  fechaEstimada?: string | null;
+  creadoPor?: string | null;
+  notas?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  cliente?: {
+    id: string;
+    codigo: string;
+    razonSocial: string;
+    ciudad?: string;
+    estado?: string;
+  };
+  sucursal?: {
+    id: string;
+    codigo: string;
+    nombre: string;
+  } | null;
+  creador?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  } | null;
+  procesos?: IngenieriaProceso[];
+  planos?: IngenieriaPlano[];
+  cotizaciones?: {
+    id: string;
+    folio: string;
+    estatus: string;
+    total: number;
+  }[];
+  _count?: {
+    procesos: number;
+    planos: number;
+  };
+}
+
+export interface IngenieriaStats {
+  activos: number;
+  enDiseno: number;
+  listosCotizar: number;
+  liberados: number;
 }
