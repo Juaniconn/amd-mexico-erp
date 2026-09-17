@@ -64,7 +64,12 @@ export default function Home() {
       return;
     }
 
-    get<User>('/api/auth/me')
+    // Use Next.js proxy instead of direct backend call
+    fetch('/api/auth/me')
+      .then((res) => {
+        if (!res.ok) throw new Error('Auth failed');
+        return res.json();
+      })
       .then((u) => setUser(u))
       .catch(() => {
         localStorage.removeItem('accessToken');
