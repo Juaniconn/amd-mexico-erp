@@ -25,7 +25,7 @@ export class ProduccionService {
         unidad: data.unidad,
         prioridad: (data.prioridad as any) || 'media',
         notas: data.notas,
-        estatus: 'PENDIENTO' as any,
+        estatus: 'PENDIENTE' as any,
         operaciones: data.operaciones
           ? {
               create: data.operaciones.map((op, idx) => ({
