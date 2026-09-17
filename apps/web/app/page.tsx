@@ -36,10 +36,30 @@ export default function Home() {
       window.history.replaceState({}, '', '/');
     }
 
-    const token = localStorage.getItem('accessToken');
+    // Check for token in cookies or localStorage
+    let token = localStorage.getItem('accessToken');
+    const cookieToken = document.cookie.split('; ').find(row => row.startsWith('accessToken='));
+    if (cookieToken && !token) {
+      token = cookieToken.split('=')[1];
+      localStorage.setItem('accessToken', token);
+    }
+    
     const storedUser = localStorage.getItem('user');
     
-    if (!token || !storedUser) {
+    if (!token && !storedUser) {
+      // Try to get user from cookie
+      const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
+      if (userCookie) {
+        try {
+          const userData = JSON.parse(decodeURIComponent(userCookie.split('=')[1]));
+          setUser(userData);
+          setLoading(false);
+          return;
+        } catch (e) {
+          // Invalid cookie, redirect to login
+        }
+      }
+      
       router.push('/login');
       return;
     }

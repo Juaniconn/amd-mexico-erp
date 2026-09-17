@@ -27,12 +27,16 @@ export default function Login() {
         return;
       }
 
-      // Store tokens in localStorage AND redirect with token in URL
+      // Store in localStorage
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Also pass token via URL param for mobile reliability
+
+      // Also set cookies for mobile browsers
+      document.cookie = `accessToken=${data.accessToken}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax`;
+      document.cookie = `refreshToken=${data.refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+
+      // Redirect with token in URL for extra reliability
       window.location.href = `/?token=${encodeURIComponent(data.accessToken)}`;
     } catch (err) {
       setError('Error de conexión con el servidor');
