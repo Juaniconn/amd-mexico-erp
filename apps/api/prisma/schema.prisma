@@ -30,6 +30,18 @@ enum EstatusCotizacion {
   ACEPTADA
   RECHAZADA
   CANCELADA
+  CONVERTIDA
+}
+
+enum EstatusParteOT {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADA
+  EN_INSPECCION
+  APROBADA
+  RECHAZADA
+  PAUSADA
+  EN_ESPERA_MATERIAL
 }
 
 enum EstatusPO {
@@ -94,6 +106,8 @@ model Usuario {
   cotizaciones  Cotizacion[] @relation("CotizacionCreador")
   ordenesCompra OrdenCompra[] @relation("POCreador")
   ordenesTrabajo OrdenTrabajo[] @relation("WOCreador")
+  ordenesTrabajoResponsable OrdenTrabajo[] @relation("OTResponsable")
+  partesOTOperador ParteOT[] @relation("ParteOTOperador")
   ventas        Venta[] @relation("VentaCreador")
   operaciones   Operacion[] @relation("OperacionOperador")
   inspecciones  ControlCalidad[] @relation("InspectorAuditor")
@@ -224,6 +238,7 @@ model Maquina {
 
   // Relaciones
   operaciones     Operacion[]
+  partesOT        ParteOT[]
 
   @@map("maquinas")
 }
@@ -279,6 +294,7 @@ model Cotizacion {
   creador         Usuario?  @relation("CotizacionCreador", fields: [creadoPor], references: [id])
   detalles         DetalleCotizacion[]
   ordenesCompra   OrdenCompra[]
+  ordenesTrabajo  OrdenTrabajo[]
 
   @@map("cotizaciones")
 }
@@ -360,11 +376,11 @@ model OrdenCompraProveedor {
 model OrdenTrabajo {
   id              String   @id @default(uuid())
   folio           String   @unique
-  poId            String   @map("po_id")
-  piezaNombre     String   @map("pieza_nombre")
-  piezaDescripcion String?  @map("pieza_descripcion")
-  cantidad        Int
-  unidad          String
+  poId            String?  @map("po_id")
+  piezaNombre     String?  @map("pieza_nombre")
+  piezaDescripcion String? @map("pieza_descripcion")
+  cantidad        Int?
+  unidad          String?
   fechaInicio     DateTime? @map("fecha_inicio")
   fechaFinEstimada DateTime? @map("fecha_fin_estimada")
   fechaFinReal    DateTime? @map("fecha_fin_real")
@@ -373,17 +389,45 @@ model OrdenTrabajo {
   notas           String?
   creadoPor       String?  @map("creado_por")
   sucursalId      String?  @map("sucursal_id")
+  cotizacionId    String?  @map("cotizacion_id")
+  responsableId   String?  @map("responsable_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   // Relaciones
-  po              OrdenCompra @relation(fields: [poId], references: [id])
+  po              OrdenCompra? @relation(fields: [poId], references: [id])
   creador         Usuario?    @relation("WOCreador", fields: [creadoPor], references: [id])
+  responsable     Usuario?    @relation("OTResponsable", fields: [responsableId], references: [id])
   sucursal         Sucursal?   @relation("SucursalWO", fields: [sucursalId], references: [id])
+  cotizacion      Cotizacion? @relation(fields: [cotizacionId], references: [id])
   operaciones     Operacion[]
   inspecciones    ControlCalidad[]
+  partes          ParteOT[]
 
   @@map("ordenes_trabajo")
+}
+
+model ParteOT {
+  id                String   @id @default(uuid())
+  otId              String   @map("ot_id")
+  numeroParte       String   @map("numero_parte")
+  piezaNombre       String   @map("pieza_nombre")
+  descripcion       String?
+  cantidad          Int
+  unidad            String
+  estatus           EstatusParteOT @default(PENDIENTE)
+  maquinaId         String?  @map("maquina_id")
+  operadorId        String?  @map("operador_id")
+  notas             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  ot                OrdenTrabajo @relation(fields: [otId], references: [id], onDelete: Cascade)
+  maquina           Maquina?     @relation(fields: [maquinaId], references: [id])
+  operador          Usuario?     @relation("ParteOTOperador", fields: [operadorId], references: [id])
+
+  @@map("partes_ot")
 }
 
 model Operacion {

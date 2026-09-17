@@ -259,3 +259,97 @@ export interface LeadListResponse {
     totalPages: number;
   };
 }
+
+// ─── Producción ──────────────────────────────────────────
+
+export interface ParteOT {
+  id: string;
+  otId: string;
+  numeroParte: string;
+  piezaNombre: string;
+  descripcion?: string;
+  cantidad: number;
+  unidad: string;
+  estatus: EstatusParteOT;
+  maquinaId?: string;
+  operadorId?: string;
+  notas?: string;
+  createdAt: string;
+  updatedAt: string;
+  operador?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+  maquina?: {
+    id: string;
+    codigo: string;
+    nombre: string;
+  };
+}
+
+export type EstatusParteOT =
+  | 'PENDIENTE'
+  | 'EN_PROCESO'
+  | 'COMPLETADA'
+  | 'EN_INSPECCION'
+  | 'APROBADA'
+  | 'RECHAZADA'
+  | 'PAUSADA'
+  | 'EN_ESPERA_MATERIAL';
+
+export interface DetalleCotizacion {
+  id: string;
+  cotizacionId: string;
+  piezaNombre: string;
+  piezaDescripcion?: string;
+  cantidad: number;
+  unidad: string;
+  precioUnitario: number;
+  subtotal: number;
+  tiempoEstimado?: number;
+  procesoRequerido?: string;
+  archivoPlanoId?: string;
+  notas?: string;
+}
+
+export interface CotizacionWithParts extends Cotizacion {
+  detalles: DetalleCotizacion[];
+  ordenesTrabajo?: OrdenTrabajo[];
+}
+
+export interface OrdenTrabajo {
+  id: string;
+  folio: string;
+  poId?: string;
+  piezaNombre?: string;
+  piezaDescripcion?: string;
+  cantidad?: number;
+  unidad?: string;
+  fechaInicio?: string;
+  fechaFinEstimada?: string;
+  fechaFinReal?: string;
+  estatus: string;
+  prioridad: string;
+  notas?: string;
+  creadoPor?: string;
+  sucursalId?: string;
+  cotizacionId?: string;
+  responsableId?: string;
+  createdAt: string;
+  updatedAt: string;
+  responsable?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+  };
+  cotizacion?: Cotizacion & { cliente: Cliente };
+  po?: OrdenCompra;
+  operaciones?: any[];
+  partes?: ParteOT[];
+  _count?: {
+    operaciones: number;
+    inspecciones: number;
+    partes: number;
+  };
+}

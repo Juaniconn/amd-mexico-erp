@@ -1,16 +1,21 @@
-import { Injectable, NotFoundException, HttpStatus } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpStatus, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateOrdenTrabajoDto, UpdateOrdenTrabajoDto, UpdateOperacionDto } from './dto/create-orden-trabajo.dto';
-import { Prisma } from '@prisma/client';
+import { CreateOrdenTrabajoFromQuoteDto } from './dto/create-orden-trabajo-from-quote.dto';
+import { AsignarParteDto } from './dto/asignar-parte.dto';
+import { UpdateEstatusParteDto } from './dto/update-estatus-parte.dto';
+import { Prisma, EstatusParteOT } from '@prisma/client';
 
 @Injectable()
 export class ProduccionService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createOrdenTrabajo(data: CreateOrdenTrabajoDto) {
-    const ordenCompra = await this.prisma.ordenCompra.findUnique({ where: { id: data.ordenCompraId } });
-    if (!ordenCompra) {
-      throw new NotFoundException({ message: 'Orden de compra no encontrada', statusCode: HttpStatus.NOT_FOUND });
+    if (data.ordenCompraId) {
+      const ordenCompra = await this.prisma.ordenCompra.findUnique({ where: { id: data.ordenCompraId } });
+      if (!ordenCompra) {
+        throw new NotFoundException({ message: 'Orden de compra no encontrada', statusCode: HttpStatus.NOT_FOUND });
+      }
     }
 
     const folio = await this.generateFolio();
@@ -18,7 +23,7 @@ export class ProduccionService {
     const ordenTrabajo = await this.prisma.ordenTrabajo.create({
       data: {
         folio,
-        po: { connect: { id: data.ordenCompraId } },
+        po: data.ordenCompraId ? { connect: { id: data.ordenCompraId } } : undefined,
         piezaNombre: data.piezaNombre,
         piezaDescripcion: data.piezaDescripcion,
         cantidad: data.cantidad,
@@ -43,6 +48,137 @@ export class ProduccionService {
     });
 
     return ordenTrabajo;
+  }
+
+  async convertirCotizacionAOrdenTrabajo(dto: CreateOrdenTrabajoFromQuoteDto) {
+    const cotizacion = await this.prisma.cotizacion.findUnique({
+      where: { id: dto.cotizacionId },
+      include: { detalles: true, cliente: true },
+    });
+
+    if (!cotizacion) {
+      throw new NotFoundException({ message: 'Cotización no encontrada', statusCode: HttpStatus.NOT_FOUND });
+    }
+
+    if (cotizacion.estatus !== 'ACEPTADA') {
+      throw new BadRequestException({
+        message: 'Solo se pueden convertir cotizaciones con estatus ACEPTADA',
+        statusCode: HttpStatus.BAD_REQUEST,
+      });
+    }
+
+    const folio = await this.generateOTFolio();
+
+    const ot = await this.prisma.ordenTrabajo.create({
+      data: {
+        folio,
+        cotizacionId: dto.cotizacionId,
+        responsableId: dto.responsableId,
+        piezaNombre: cotizacion.detalles.length > 0 ? cotizacion.detalles[0].piezaNombre : null,
+        cantidad: cotizacion.detalles.reduce((sum, d) => sum + d.cantidad, 0),
+        unidad: cotizacion.detalles.length > 0 ? cotizacion.detalles[0].unidad : null,
+        prioridad: 'MEDIA',
+        estatus: 'PENDIENTE' as any,
+        partes: {
+          create: cotizacion.detalles.map((detalle, index) => ({
+            numeroParte: `${cotizacion.folio}-P${String(index + 1).padStart(3, '0')}`,
+            piezaNombre: detalle.piezaNombre,
+            descripcion: detalle.piezaDescripcion,
+            cantidad: detalle.cantidad,
+            unidad: detalle.unidad,
+            estatus: EstatusParteOT.PENDIENTE,
+          })),
+        },
+      },
+      include: {
+        partes: true,
+        cotizacion: { include: { cliente: true } },
+        responsable: { select: { id: true, nombre: true, apellido: true } },
+      },
+    });
+
+    await this.prisma.cotizacion.update({
+      where: { id: dto.cotizacionId },
+      data: { estatus: 'CONVERTIDA' },
+    });
+
+    return ot;
+  }
+
+  async asignarOperadorAParte(parteId: string, dto: AsignarParteDto) {
+    try {
+      return await this.prisma.parteOT.update({
+        where: { id: parteId },
+        data: {
+          operadorId: dto.operadorId,
+          maquinaId: dto.maquinaId,
+          notas: dto.notas || undefined,
+        },
+        include: { operador: true, maquina: true, ot: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new NotFoundException({ message: 'Parte no encontrada', statusCode: HttpStatus.NOT_FOUND });
+      }
+      throw error;
+    }
+  }
+
+  async actualizarEstatusParte(parteId: string, dto: UpdateEstatusParteDto) {
+    try {
+      return await this.prisma.parteOT.update({
+        where: { id: parteId },
+        data: { estatus: dto.estatus as EstatusParteOT },
+        include: { operador: true, maquina: true, ot: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new NotFoundException({ message: 'Parte no encontrada', statusCode: HttpStatus.NOT_FOUND });
+      }
+      throw error;
+    }
+  }
+
+  async asignarResponsableOT(otId: string, responsableId: string) {
+    try {
+      return await this.prisma.ordenTrabajo.update({
+        where: { id: otId },
+        data: { responsableId },
+        include: {
+          responsable: { select: { id: true, nombre: true, apellido: true } },
+          cotizacion: { include: { cliente: true } },
+          partes: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new NotFoundException({ message: 'Orden de trabajo no encontrada', statusCode: HttpStatus.NOT_FOUND });
+      }
+      throw error;
+    }
+  }
+
+  async findByCotizacionId(cotizacionId: string) {
+    return this.prisma.ordenTrabajo.findMany({
+      where: { cotizacionId },
+      include: {
+        responsable: { select: { id: true, nombre: true, apellido: true } },
+        cotizacion: { include: { cliente: true } },
+        _count: { select: { partes: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findPartesByOT(otId: string) {
+    return this.prisma.parteOT.findMany({
+      where: { otId },
+      include: {
+        operador: { select: { id: true, nombre: true, apellido: true } },
+        maquina: { select: { id: true, codigo: true, nombre: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   async findAllOrdenesTrabajo(page: number = 1, limit: number = 10, search?: string, estatus?: string) {
@@ -170,6 +306,21 @@ export class ProduccionService {
     let sequence = 1;
     if (last) {
       const match = last.folio.match(/WO-\d+-(\d+)/);
+      if (match) sequence = parseInt(match[1], 10) + 1;
+    }
+    return `${prefix}${String(sequence).padStart(4, '0')}`;
+  }
+
+  private async generateOTFolio(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `OT-${year}-`;
+    const last = await this.prisma.ordenTrabajo.findFirst({
+      where: { folio: { startsWith: prefix } },
+      orderBy: { createdAt: 'desc' },
+    });
+    let sequence = 1;
+    if (last) {
+      const match = last.folio.match(/OT-\d+-(\d+)/);
       if (match) sequence = parseInt(match[1], 10) + 1;
     }
     return `${prefix}${String(sequence).padStart(4, '0')}`;

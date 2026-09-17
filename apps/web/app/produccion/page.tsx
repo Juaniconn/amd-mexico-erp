@@ -18,10 +18,7 @@ import {
   Search,
   Plus,
   Eye,
-  Pencil,
-  Trash2,
   X,
-  Factory,
   ClipboardList,
   Clock,
   Loader2,
@@ -30,103 +27,97 @@ import {
   Inbox,
   CalendarDays,
   User,
-  Wrench,
   FileText,
+  ArrowRightLeft,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-interface OrdenProduccion {
+interface OrdenTrabajo {
   id: string;
   folio: string;
-  cliente: string;
-  pieza: string;
-  cantidad: number;
-  fechaInicio: string;
-  fechaEntrega: string;
-  estatus: 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA' | 'CANCELADA';
-  prioridad: 'ALTA' | 'MEDIA' | 'BAJA';
-  responsable: string;
-  notas?: string;
+  estatus: string;
+  prioridad: string;
+  fecha: string;
+  responsable?: string;
+  cliente?: string;
+  cotizacionId?: string;
+  _count?: { partes: number };
 }
 
 const ESTATUS_OPTIONS = [
   { value: 'PENDIENTE', label: 'Pendiente' },
-  { value: 'EN_PROCESO', label: 'En Proceso' },
+  { value: 'EN_PRODUCCION', label: 'En Producción' },
+  { value: 'CALIDAD', label: 'En Calidad' },
   { value: 'COMPLETADA', label: 'Completada' },
   { value: 'CANCELADA', label: 'Cancelada' },
 ];
 
 const PRIORIDAD_OPTIONS = [
-  { value: 'ALTA', label: 'Alta' },
-  { value: 'MEDIA', label: 'Media' },
   { value: 'BAJA', label: 'Baja' },
+  { value: 'MEDIA', label: 'Media' },
+  { value: 'ALTA', label: 'Alta' },
+  { value: 'URGENTE', label: 'Urgente' },
 ];
 
 const VERSION = '1.0.0';
 
-// Demo data — replaces API calls until backend endpoint is ready
-const DEMO_ORDENES: OrdenProduccion[] = [
+const DEMO_ORDENES: OrdenTrabajo[] = [
   {
     id: '1',
-    folio: 'OP-2026-001',
-    cliente: 'Maquinados del Norte S.A.',
-    pieza: 'Soporte estructural 40x60',
-    cantidad: 50,
-    fechaInicio: '2026-09-10',
-    fechaEntrega: '2026-09-25',
-    estatus: 'EN_PROCESO',
+    folio: 'OT-2026-001',
+    estatus: 'EN_PRODUCCION',
     prioridad: 'ALTA',
+    fecha: '2026-09-10',
     responsable: 'Carlos Mendoza',
-    notas: 'Requiere inspección dimensional final',
+    cliente: 'Maquinados del Norte S.A.',
+    _count: { partes: 5 },
   },
   {
     id: '2',
-    folio: 'OP-2026-002',
-    cliente: 'Tecnología Avanzada MX',
-    pieza: 'Cubierta aluminio CNC',
-    cantidad: 120,
-    fechaInicio: '2026-09-12',
-    fechaEntrega: '2026-09-28',
+    folio: 'OT-2026-002',
     estatus: 'PENDIENTE',
     prioridad: 'MEDIA',
+    fecha: '2026-09-12',
     responsable: 'Ana García',
+    cliente: 'Tecnología Avanzada MX',
+    _count: { partes: 3 },
   },
   {
     id: '3',
-    folio: 'OP-2026-003',
-    cliente: 'Industrias Ferromex',
-    pieza: 'Eje de transmisión pulido',
-    cantidad: 25,
-    fechaInicio: '2026-09-05',
-    fechaEntrega: '2026-09-20',
+    folio: 'OT-2026-003',
     estatus: 'COMPLETADA',
     prioridad: 'BAJA',
+    fecha: '2026-09-05',
     responsable: 'Luis Ramírez',
+    cliente: 'Industrias Ferromex',
+    _count: { partes: 12 },
   },
   {
     id: '4',
-    folio: 'OP-2026-004',
-    cliente: 'Automatización Integral',
-    pieza: 'Placa base templada',
-    cantidad: 80,
-    fechaInicio: '2026-09-15',
-    fechaEntrega: '2026-10-01',
-    estatus: 'EN_PROCESO',
+    folio: 'OT-2026-004',
+    estatus: 'CALIDAD',
     prioridad: 'ALTA',
+    fecha: '2026-09-15',
     responsable: 'Carlos Mendoza',
-    notas: 'Material en tránsito — iniciar el lunes',
+    cliente: 'Automatización Integral',
+    _count: { partes: 8 },
   },
   {
     id: '5',
-    folio: 'OP-2026-005',
-    cliente: 'Mecánica Progreso',
-    pieza: 'Rodillo cilíndrico estándar',
-    cantidad: 200,
-    fechaInicio: '2026-09-08',
-    fechaEntrega: '2026-09-18',
-    estatus: 'COMPLETADA',
+    folio: 'OT-2026-005',
+    estatus: 'PENDIENTE',
     prioridad: 'MEDIA',
+    fecha: '2026-09-08',
     responsable: 'Ana García',
+    cliente: 'Mecánica Progreso',
+    _count: { partes: 6 },
   },
+];
+
+const DEMO_COTIZACIONES_APROBADAS = [
+  { id: 'cot-1', folio: 'COT-2026-0042', cliente: 'Industrias Beta', total: 45000 },
+  { id: 'cot-2', folio: 'COT-2026-0043', cliente: 'Metalúrgica del Sur', total: 128000 },
+  { id: 'cot-3', folio: 'COT-2026-0044', cliente: 'Mecanizados Precisión', total: 32000 },
 ];
 
 export default function ProduccionPage() {
@@ -138,30 +129,20 @@ export default function ProduccionPage() {
 }
 
 function ProduccionContent() {
-  const [ordenes, setOrdenes] = useState<OrdenProduccion[]>([]);
+  const router = useRouter();
+  const [ordenes, setOrdenes] = useState<OrdenTrabajo[]>([]);
   const [meta, setMeta] = useState<{ total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [showConvertirModal, setShowConvertirModal] = useState(false);
 
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<OrdenProduccion | null>(null);
-
-  const [form, setForm] = useState({
-    folio: '',
-    cliente: '',
-    pieza: '',
-    cantidad: 1,
-    fechaInicio: '',
-    fechaEntrega: '',
-    estatus: 'PENDIENTE' as OrdenProduccion['estatus'],
-    prioridad: 'MEDIA' as OrdenProduccion['prioridad'],
-    responsable: '',
-    notas: '',
-  });
+  const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState('');
+  const [responsableConvertir, setResponsableConvertir] = useState('');
+  const [convertirLoading, setConvertirLoading] = useState(false);
+  const [convertirError, setConvertirError] = useState('');
 
   useEffect(() => {
-    // Simulate API load with demo data
     const timer = setTimeout(() => {
       setOrdenes(DEMO_ORDENES);
       setMeta({ total: DEMO_ORDENES.length });
@@ -179,9 +160,8 @@ function ProduccionContent() {
         filtered = DEMO_ORDENES.filter(
           (o) =>
             o.folio.toLowerCase().includes(q) ||
-            o.cliente.toLowerCase().includes(q) ||
-            o.pieza.toLowerCase().includes(q) ||
-            o.responsable.toLowerCase().includes(q)
+            o.cliente?.toLowerCase().includes(q) ||
+            o.responsable?.toLowerCase().includes(q)
         );
       }
       setOrdenes(filtered);
@@ -190,89 +170,37 @@ function ProduccionContent() {
     }, 400);
   }
 
-  function openNew() {
-    setEditing(null);
-    setForm({
-      folio: `OP-2026-${String(DEMO_ORDENES.length + 1).padStart(3, '0')}`,
-      cliente: '',
-      pieza: '',
-      cantidad: 1,
-      fechaInicio: new Date().toISOString().slice(0, 10),
-      fechaEntrega: '',
-      estatus: 'PENDIENTE',
-      prioridad: 'MEDIA',
-      responsable: '',
-      notas: '',
-    });
-    setShowModal(true);
-  }
-
-  function openEdit(o: OrdenProduccion) {
-    setEditing(o);
-    setForm({
-      folio: o.folio,
-      cliente: o.cliente,
-      pieza: o.pieza,
-      cantidad: o.cantidad,
-      fechaInicio: o.fechaInicio,
-      fechaEntrega: o.fechaEntrega,
-      estatus: o.estatus,
-      prioridad: o.prioridad,
-      responsable: o.responsable,
-      notas: o.notas || '',
-    });
-    setShowModal(true);
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  function handleConvertirCotizacion(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setConvertirError('');
 
-    const payload: OrdenProduccion = {
-      id: editing?.id ?? crypto.randomUUID(),
-      ...form,
-      cantidad: Number(form.cantidad),
-    };
-
-    if (editing) {
-      // Update existing
-      const idx = DEMO_ORDENES.findIndex((o) => o.id === editing.id);
-      if (idx !== -1) {
-        DEMO_ORDENES[idx] = payload;
-      }
-    } else {
-      // Create new
-      DEMO_ORDENES.unshift(payload);
+    if (!cotizacionSeleccionada) {
+      setConvertirError('Seleccione una cotización');
+      return;
     }
 
-    setShowModal(false);
-    loadOrdenes();
+    setConvertirLoading(true);
+    setTimeout(() => {
+      setConvertirLoading(false);
+      setShowConvertirModal(false);
+      setCotizacionSeleccionada('');
+      setResponsableConvertir('');
+    }, 1000);
   }
 
-  function handleDelete(id: string) {
-    if (!confirm('¿Está seguro de eliminar esta orden de producción?')) return;
-    const idx = DEMO_ORDENES.findIndex((o) => o.id === id);
-    if (idx !== -1) {
-      DEMO_ORDENES.splice(idx, 1);
-      loadOrdenes();
-    }
+  function handleFolioClick(id: string) {
+    router.push(`/produccion/ot/${id}`);
   }
 
-  function handleSearch() {
-    loadOrdenes();
-  }
-
-  // Stats calculations
   const ordenesActivas = ordenes.filter(
     (o) => o.estatus !== 'CANCELADA'
   ).length;
   const pendientes = ordenes.filter((o) => o.estatus === 'PENDIENTE').length;
-  const enProceso = ordenes.filter((o) => o.estatus === 'EN_PROCESO').length;
+  const enProceso = ordenes.filter((o) => o.estatus === 'EN_PRODUCCION' || o.estatus === 'CALIDAD').length;
   const completadas = ordenes.filter((o) => o.estatus === 'COMPLETADA').length;
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Producción</h1>
@@ -280,64 +208,48 @@ function ProduccionContent() {
             Órdenes de trabajo, operaciones y control de calidad
           </p>
         </div>
-        <Button onClick={openNew} size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nueva Orden
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowConvertirModal(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            Convertir Cotización
+          </Button>
+          <Button size="sm" className="gap-2" disabled>
+            <Plus className="h-4 w-4" />
+            Nueva OT
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Órdenes activas"
-          value={ordenesActivas}
-          icon={<ClipboardList className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Pendientes"
-          value={pendientes}
-          icon={<Clock className="h-4 w-4" />}
-          variant="warning"
-        />
-        <StatCard
-          title="En proceso"
-          value={enProceso}
-          icon={<Loader2 className="h-4 w-4" />}
-          variant="default"
-        />
-        <StatCard
-          title="Completadas"
-          value={completadas}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          variant="success"
-        />
+        <StatCard title="Órdenes activas" value={ordenesActivas} icon={<ClipboardList className="h-4 w-4" />} />
+        <StatCard title="Pendientes" value={pendientes} icon={<Clock className="h-4 w-4" />} variant="warning" />
+        <StatCard title="En proceso" value={enProceso} icon={<Loader2 className="h-4 w-4" />} variant="default" />
+        <StatCard title="Completadas" value={completadas} icon={<CheckCircle2 className="h-4 w-4" />} variant="success" />
       </div>
 
-      {/* Search/Filter Bar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Buscar por folio, cliente, pieza o responsable..."
+            placeholder="Buscar por folio, cliente o responsable..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            onKeyDown={(e) => e.key === 'Enter' && loadOrdenes()}
             className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
           />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSearch}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={loadOrdenes} className="gap-2">
           <Search className="h-3.5 w-3.5" />
           Buscar
         </Button>
       </div>
 
-      {/* Error State */}
       {error && (
         <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-5 w-5 shrink-0" />
@@ -345,17 +257,14 @@ function ProduccionContent() {
         </div>
       )}
 
-      {/* Table */}
       <TableContainer>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Folio</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead>Pieza</TableHead>
-              <TableHead>Cantidad</TableHead>
-              <TableHead>Fecha inicio</TableHead>
-              <TableHead>Fecha entrega</TableHead>
+              <TableHead>Partes</TableHead>
+              <TableHead>Fecha</TableHead>
               <TableHead>Prioridad</TableHead>
               <TableHead>Estatus</TableHead>
               <TableHead>Responsable</TableHead>
@@ -364,27 +273,30 @@ function ProduccionContent() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableSkeletonRows colCount={10} />
+              <TableSkeletonRows colCount={8} />
             ) : ordenes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10}>
+                <TableCell colSpan={8}>
                   <EmptyState />
                 </TableCell>
               </TableRow>
             ) : (
               ordenes.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.folio}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {o.cliente}
+                  <TableCell className="font-medium">
+                    <button
+                      onClick={() => handleFolioClick(o.id)}
+                      className="text-primary hover:underline focus:outline-none"
+                    >
+                      {o.folio}
+                    </button>
                   </TableCell>
-                  <TableCell>{o.pieza}</TableCell>
-                  <TableCell>{o.cantidad}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(o.fechaInicio + 'T00:00:00').toLocaleDateString('es-MX')}
+                    {o.cliente || '—'}
                   </TableCell>
+                  <TableCell>{o._count?.partes || 0}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(o.fechaEntrega + 'T00:00:00').toLocaleDateString('es-MX')}
+                    {new Date(o.fecha + 'T00:00:00').toLocaleDateString('es-MX')}
                   </TableCell>
                   <TableCell>
                     <PrioridadBadge prioridad={o.prioridad} />
@@ -393,34 +305,17 @@ function ProduccionContent() {
                     <EstatusBadge estatus={o.estatus} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {o.responsable}
+                    {o.responsable || '—'}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() => openEdit(o)}
-                        title="Ver orden"
+                        onClick={() => handleFolioClick(o.id)}
+                        title="Ver detalle"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(o)}
-                        title="Editar orden"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDelete(o.id)}
-                        title="Eliminar orden"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>
@@ -428,251 +323,100 @@ function ProduccionContent() {
               ))
             )}
           </TableBody>
-        </Table>
 
-        {/* Pagination Footer */}
-        {meta && !loading && ordenes.length > 0 && (
-          <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
-            <span>
-              Mostrando {ordenes.length} de {meta.total} órdenes
-            </span>
-          </div>
-        )}
+          {meta && !loading && ordenes.length > 0 && (
+            <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
+              <span>
+                Mostrando {ordenes.length} de {meta.total} órdenes
+              </span>
+            </div>
+          )}
+        </Table>
       </TableContainer>
 
-      {/* Footer */}
       <footer className="border-t pt-4 text-center">
         <p className="text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} AMD México Operations ERP &middot; v{VERSION}
         </p>
       </footer>
 
-      {/* Modal */}
-      {showModal && (
+      {/* Modal Convertir Cotización a OT */}
+      {showConvertirModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex-row items-center justify-between space-y-0 border-b pb-4">
-              <CardTitle>
-                {editing ? 'Editar Orden de Producción' : 'Nueva Orden de Producción'}
-              </CardTitle>
+              <CardTitle>Convertir Cotización a OT</CardTitle>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowConvertirModal(false);
+                  setConvertirError('');
+                }}
               >
                 <X className="h-4 w-4" />
               </Button>
             </CardHeader>
             <CardContent className="pt-5">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Folio + Responsable */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Folio *
-                    </label>
-                    <div className="relative">
-                      <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        required
-                        value={form.folio}
-                        onChange={(e) => setForm({ ...form, folio: e.target.value })}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Responsable *
-                    </label>
-                    <div className="relative">
-                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        required
-                        value={form.responsable}
-                        onChange={(e) =>
-                          setForm({ ...form, responsable: e.target.value })
-                        }
-                        placeholder="Nombre del responsable"
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cliente */}
+              <form onSubmit={handleConvertirCotizacion} className="space-y-5">
                 <div className="space-y-1.5">
                   <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Cliente *
+                    Cotización Aprobada *
+                  </label>
+                  <select
+                    value={cotizacionSeleccionada}
+                    onChange={(e) => setCotizacionSeleccionada(e.target.value)}
+                    className="w-full appearance-none rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                    required
+                  >
+                    <option value="">Seleccionar cotización...</option>
+                    {DEMO_COTIZACIONES_APROBADAS.map((cot) => (
+                      <option key={cot.id} value={cot.id}>
+                        {cot.folio} — {cot.cliente} (${cot.total.toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Responsable (Manager)
                   </label>
                   <div className="relative">
-                    <Factory className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="text"
-                      required
-                      value={form.cliente}
-                      onChange={(e) =>
-                        setForm({ ...form, cliente: e.target.value })
-                      }
-                      placeholder="Nombre del cliente"
+                      value={responsableConvertir}
+                      onChange={(e) => setResponsableConvertir(e.target.value)}
+                      placeholder="Nombre del responsable"
                       className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                {/* Pieza */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Pieza / Descripción *
-                  </label>
-                  <div className="relative">
-                    <Wrench className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      required
-                      value={form.pieza}
-                      onChange={(e) =>
-                        setForm({ ...form, pieza: e.target.value })
-                      }
-                      placeholder="Descripción de la pieza"
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Cantidad + Prioridad */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Cantidad *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={form.cantidad}
-                      onChange={(e) =>
-                        setForm({ ...form, cantidad: Number(e.target.value) })
-                      }
-                      className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Prioridad
-                    </label>
-                    <select
-                      value={form.prioridad}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          prioridad: e.target.value as OrdenProduccion['prioridad'],
-                        })
-                      }
-                      className="w-full appearance-none rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    >
-                      {PRIORIDAD_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Fecha inicio + Fecha entrega */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Fecha inicio *
-                    </label>
-                    <div className="relative">
-                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="date"
-                        required
-                        value={form.fechaInicio}
-                        onChange={(e) =>
-                          setForm({ ...form, fechaInicio: e.target.value })
-                        }
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Fecha entrega *
-                    </label>
-                    <div className="relative">
-                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="date"
-                        required
-                        value={form.fechaEntrega}
-                        onChange={(e) =>
-                          setForm({ ...form, fechaEntrega: e.target.value })
-                        }
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Estatus (only when editing) */}
-                {editing && (
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Estatus
-                    </label>
-                    <select
-                      value={form.estatus}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          estatus: e.target.value as OrdenProduccion['estatus'],
-                        })
-                      }
-                      className="w-full appearance-none rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    >
-                      {ESTATUS_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                {convertirError && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    {convertirError}
                   </div>
                 )}
 
-                {/* Notas */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Notas
-                  </label>
-                  <textarea
-                    value={form.notas}
-                    onChange={(e) =>
-                      setForm({ ...form, notas: e.target.value })
-                    }
-                    rows={3}
-                    placeholder="Observaciones, instrucciones especiales..."
-                    className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none resize-none"
-                  />
-                </div>
-
-                {/* Actions */}
                 <div className="flex justify-end gap-3 border-t pt-4">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => {
+                      setShowConvertirModal(false);
+                      setConvertirError('');
+                    }}
                   >
                     Cancelar
                   </Button>
-                  <Button type="submit" size="sm" className="gap-2">
-                    {editing ? 'Actualizar' : 'Crear Orden'}
+                  <Button type="submit" size="sm" className="gap-2" disabled={convertirLoading}>
+                    {convertirLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    <ArrowRightLeft className="h-4 w-4" />
+                    Convertir a OT
                   </Button>
                 </div>
               </form>
@@ -725,13 +469,15 @@ function StatCard({
 function EstatusBadge({ estatus }: { estatus: string }) {
   const variantMap: Record<string, 'warning' | 'default' | 'success' | 'destructive'> = {
     PENDIENTE: 'warning',
-    EN_PROCESO: 'default',
+    EN_PRODUCCION: 'default',
+    CALIDAD: 'default',
     COMPLETADA: 'success',
     CANCELADA: 'destructive',
   };
   const labelMap: Record<string, string> = {
     PENDIENTE: 'Pendiente',
-    EN_PROCESO: 'En Proceso',
+    EN_PRODUCCION: 'En Producción',
+    CALIDAD: 'En Calidad',
     COMPLETADA: 'Completada',
     CANCELADA: 'Cancelada',
   };
@@ -784,10 +530,10 @@ function EmptyState() {
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
       <p className="text-sm font-medium text-muted-foreground">
-        No hay órdenes de producción
+        No hay órdenes de trabajo
       </p>
       <p className="mt-1 text-xs text-muted-foreground/70">
-        Cree una nueva orden para comenzar
+        Convierta una cotización aprobada para comenzar
       </p>
     </div>
   );
