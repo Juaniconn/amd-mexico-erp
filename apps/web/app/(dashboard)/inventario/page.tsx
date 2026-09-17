@@ -19,7 +19,7 @@ export default function InventarioPage() {
         }
 
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/inventario/materiales?limit=100`,
+          `${process.env.NEXT_PUBLIC_API_URL || '/api'}/inventario/materiales?limit=100`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }

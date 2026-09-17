@@ -31,10 +31,10 @@ export default function DashboardPage() {
         };
 
         const [clientes, cotizaciones, ordenes, materiales] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/clientes?limit=1`, { headers }).then((r) => r.json()),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/cotizaciones?limit=1`, { headers }).then((r) => r.json()),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/ordenes-compra?limit=1`, { headers }).then((r) => r.json()),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/materiales?limit=1`, { headers }).then((r) => r.json()),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/clientes?limit=1`, { headers }).then((r) => r.json()),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/cotizaciones?limit=1`, { headers }).then((r) => r.json()),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ordenes-compra?limit=1`, { headers }).then((r) => r.json()),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/materiales?limit=1`, { headers }).then((r) => r.json()),
         ]);
 
         setStats({

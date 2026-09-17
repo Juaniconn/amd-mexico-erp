@@ -137,7 +137,7 @@ export default function ClientesPage() {
         creditoLimite: form.creditoLimite ? Number(form.creditoLimite) : null,
       };
       if (editing) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/clientes/${editing.id}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/clientes/${editing.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -146,7 +146,7 @@ export default function ClientesPage() {
           body: JSON.stringify(payload),
         });
       } else {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/clientes`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/clientes`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -166,7 +166,7 @@ export default function ClientesPage() {
     if (!confirm('¿Está seguro de eliminar este cliente?')) return;
     try {
       setError('');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/clientes/${id}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/clientes/${id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
