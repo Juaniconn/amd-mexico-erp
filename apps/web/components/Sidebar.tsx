@@ -142,7 +142,23 @@ export function MobileSidebar({ open, onClose }: { open: boolean; onClose: () =>
   );
 }
 
-export function Header({ title, user, onMenuClick }: { title: string; user: any; onMenuClick: () => void }) {
+export function Header({ 
+  title, 
+  user, 
+  onMenuClick, 
+  onNotificationsClick, 
+  onSearchClick, 
+  onThemeToggle, 
+  theme 
+}: { 
+  title: string; 
+  user: any; 
+  onMenuClick: () => void;
+  onNotificationsClick: () => void;
+  onSearchClick: () => void;
+  onThemeToggle: () => void;
+  theme: 'light' | 'dark';
+}) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-sidebar-border bg-sidebar px-4 sm:px-6">
       <button onClick={onMenuClick} className="lg:hidden text-gray-400 hover:text-white">
@@ -153,12 +169,20 @@ export function Header({ title, user, onMenuClick }: { title: string; user: any;
 
       <div className="ml-auto flex items-center gap-2">
         {/* Search */}
-        <button className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-sidebar-accent hover:text-white">
+        <button 
+          onClick={onSearchClick}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-sidebar-accent hover:text-white"
+          title="Buscar (⌘K)"
+        >
           <Search className="h-4 w-4" />
         </button>
 
         {/* Notifications */}
-        <button className="relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-sidebar-accent hover:text-white">
+        <button 
+          onClick={onNotificationsClick}
+          className="relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-sidebar-accent hover:text-white"
+          title="Notificaciones"
+        >
           <Bell className="h-4 w-4" />
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">
             3
@@ -166,8 +190,12 @@ export function Header({ title, user, onMenuClick }: { title: string; user: any;
         </button>
 
         {/* Theme toggle */}
-        <button className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-sidebar-accent hover:text-white">
-          <Moon className="h-4 w-4" />
+        <button 
+          onClick={onThemeToggle}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-sidebar-accent hover:text-white"
+          title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+        >
+          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </button>
 
         {/* User */}
