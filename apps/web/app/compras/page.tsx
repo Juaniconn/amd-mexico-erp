@@ -1,7 +1,31 @@
 'use client';
 
 import { useEffect, useState, FormEvent, useCallback } from 'react';
+import { AppLayout } from '@/components/AppLayout';
+import { Card, CardContent } from '@/components/Card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { get, post, del, ApiError } from '@/lib/api';
+import {
+  ShoppingCart,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Search,
+  Plus,
+  Edit3,
+  Trash2,
+  FileText,
+  Users,
+  Package,
+  DollarSign,
+  Calendar,
+  MessageSquare,
+  X,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 
 interface Cliente {
   id: string;
@@ -57,6 +81,14 @@ interface ProveedorLinea {
 }
 
 export default function ComprasPage() {
+  return (
+    <AppLayout>
+      <ComprasContent />
+    </AppLayout>
+  );
+}
+
+function ComprasContent() {
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -191,7 +223,6 @@ export default function ComprasPage() {
           })),
       };
       if (editing) {
-        // Note: PUT endpoint may not exist yet, but we include the logic
         await post(`/api/ordenes-compra/${editing.id}`, payload);
       } else {
         await post('/api/ordenes-compra', payload);
@@ -229,219 +260,298 @@ export default function ComprasPage() {
     return p ? `${p.codigo} — ${p.razonSocial}` : proveedorId;
   }
 
+  function handleSearch() {
+    setPage(1);
+    loadOrdenes(1, search);
+  }
+
   const { subtotal, iva, total } = calcularTotales();
 
+  // Stats
+  const totalOrdenes = ordenes.length;
+  const pendientes = ordenes.filter((o) => o.estatus === 'pendiente' || o.estatus === 'PENDIENTE').length;
+  const aprobadas = ordenes.filter((o) => o.estatus === 'aprobada' || o.estatus === 'APROBADA').length;
+  const rechazadas = ordenes.filter((o) => o.estatus === 'rechazada' || o.estatus === 'cancelada' || o.estatus === 'CANCELADA').length;
+
   return (
-    <div>
+    <div className="animate-fade-up">
+      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Compras</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-bold text-foreground">Compras</h1>
+          <p className="text-sm text-muted-foreground">
             Órdenes de compra y proveedores
           </p>
         </div>
-        <button
+        <Button
           onClick={openNew}
           disabled={clientes.length === 0 || proveedores.length === 0}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+          size="lg"
         >
+          <Plus className="mr-2 h-4 w-4" />
           Nueva Orden de Compra
-        </button>
+        </Button>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <input
-          type="text"
-          placeholder="Buscar por folio, cliente o estatus..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && loadOrdenes(1, search)}
-          className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+      {/* Stats */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={<ShoppingCart className="h-5 w-5" />}
+          label="Total"
+          value={totalOrdenes}
+          color="brand"
         />
-        <button
-          onClick={() => loadOrdenes(1, search)}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-        >
-          Buscar
-        </button>
+        <StatCard
+          icon={<Clock className="h-5 w-5" />}
+          label="Pendientes"
+          value={pendientes}
+          color="warning"
+        />
+        <StatCard
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          label="Aprobadas"
+          value={aprobadas}
+          color="success"
+        />
+        <StatCard
+          icon={<XCircle className="h-5 w-5" />}
+          label="Rechazadas"
+          value={rechazadas}
+          color="danger"
+        />
       </div>
 
+      {/* Search */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar por folio, cliente o estatus..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
+          />
+        </div>
+        <Button variant="outline" onClick={handleSearch}>
+          <Search className="mr-2 h-4 w-4" />
+          Buscar
+        </Button>
+      </div>
+
+      {/* Error */}
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive-muted px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-3">Folio</th>
-              <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3">Estatus</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
+      {/* Table */}
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Folio</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead>Estatus</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  Cargando...
-                </td>
-              </tr>
+              <TableRow>
+                <TableCell colSpan={6}>
+                  <div className="flex flex-col items-center justify-center gap-3 py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-brand" />
+                    <p className="text-sm text-muted-foreground">Cargando órdenes de compra...</p>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : ordenes.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  No hay órdenes de compra registradas
-                </td>
-              </tr>
+              <TableRow>
+                <TableCell colSpan={6}>
+                  <div className="flex flex-col items-center justify-center gap-3 py-12">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                      <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">No hay órdenes de compra registradas</p>
+                    <p className="text-xs text-muted-foreground">Crea tu primera orden de compra para comenzar</p>
+                    <Button variant="outline" size="sm" onClick={openNew}>
+                      <Plus className="mr-2 h-3 w-3" />
+                      Nueva Orden
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : (
               ordenes.map((o) => (
-                <tr key={o.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">
+                <TableRow key={o.id}>
+                  <TableCell className="font-medium text-foreground">
                     {o.folio}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell>
                     {o.razonSocial || o.clienteId}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {new Date(o.createdAt).toLocaleDateString('es-MX')}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
                     {o.moneda === 'USD' ? '$' : '$'}
                     {Number(o.total).toLocaleString('es-MX', {
                       minimumFractionDigits: 2,
                     })}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell>
                     <StatusBadge estatus={o.estatus} />
-                  </td>
-                  <td className="px-4 py-3 text-right space-x-1">
-                    <button
-                      onClick={() => openEdit(o)}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(o.id)}
-                      className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-50"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon-sm" onClick={() => openEdit(o)}>
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(o.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-danger" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
 
+        {/* Pagination */}
         {meta && (
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="flex items-center justify-between border-t border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
             <span>
               Mostrando {ordenes.length} de {meta.total} órdenes
             </span>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded-md border border-slate-300 px-3 py-1 transition hover:bg-white disabled:opacity-50"
               >
                 Anterior
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() =>
                   setPage((p) => Math.min(meta.totalPages, p + 1))
                 }
                 disabled={page >= meta.totalPages}
-                className="rounded-md border border-slate-300 px-3 py-1 transition hover:bg-white disabled:opacity-50"
               >
                 Siguiente
-              </button>
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </TableContainer>
 
+      {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="mb-4 text-lg font-bold text-slate-900">
-              {editing ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
-            </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-card p-6 shadow-2xl ring-1 ring-foreground/10 max-h-[90vh] overflow-y-auto animate-fade-up">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg brand-gradient">
+                  <ShoppingCart className="h-5 w-5 text-white" />
+                </div>
+                <h2 className="text-lg font-bold text-foreground">
+                  {editing ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
+                </h2>
+              </div>
+              <Button variant="ghost" size="icon-sm" onClick={() => setShowModal(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     Cliente *
                   </label>
-                  <select
-                    required
-                    value={clienteId}
-                    onChange={(e) => setClienteId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Seleccionar cliente...</option>
-                    {clientes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.codigo} — {c.razonSocial}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <select
+                      required
+                      value={clienteId}
+                      onChange={(e) => setClienteId(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                    >
+                      <option value="">Seleccionar cliente...</option>
+                      {clientes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.codigo} — {c.razonSocial}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     Cotización (opcional)
                   </label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={cotizacionId}
+                      onChange={(e) => setCotizacionId(e.target.value)}
+                      placeholder="ID de cotización relacionada"
+                      className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Condiciones de pago
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
-                    value={cotizacionId}
-                    onChange={(e) => setCotizacionId(e.target.value)}
-                    placeholder="ID de cotización relacionada"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    value={condicionesPago}
+                    onChange={(e) => setCondicionesPago(e.target.value)}
+                    placeholder="Ej: 30 días, Contra entrega..."
+                    className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
-                  Condiciones de pago
-                </label>
-                <input
-                  type="text"
-                  value={condicionesPago}
-                  onChange={(e) => setCondicionesPago(e.target.value)}
-                  placeholder="Ej: 30 días, Contra entrega..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-700">
+                  <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     Líneas de proveedores *
                   </label>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={addLinea}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                   >
-                    + Agregar línea
-                  </button>
+                    <Plus className="mr-1 h-3 w-3" />
+                    Agregar línea
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
                   {lineas.map((l, idx) => (
                     <div
                       key={idx}
-                      className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                      className="rounded-lg border border-border bg-muted/50 p-3"
                     >
                       <div className="grid grid-cols-12 gap-2 items-end">
                         <div className="col-span-5">
-                          <label className="mb-1 block text-xs text-slate-500">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             Proveedor *
                           </label>
                           <select
@@ -450,7 +560,7 @@ export default function ComprasPage() {
                             onChange={(e) =>
                               updateLinea(idx, 'proveedorId', e.target.value)
                             }
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
                           >
                             <option value="">Seleccionar proveedor...</option>
                             {proveedores.map((p) => (
@@ -461,7 +571,7 @@ export default function ComprasPage() {
                           </select>
                         </div>
                         <div className="col-span-2">
-                          <label className="mb-1 block text-xs text-slate-500">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             Cantidad
                           </label>
                           <input
@@ -472,11 +582,11 @@ export default function ComprasPage() {
                             onChange={(e) =>
                               updateLinea(idx, 'cantidad', Number(e.target.value))
                             }
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
                           />
                         </div>
                         <div className="col-span-2">
-                          <label className="mb-1 block text-xs text-slate-500">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             Precio unitario
                           </label>
                           <input
@@ -491,14 +601,14 @@ export default function ComprasPage() {
                                 Number(e.target.value)
                               )
                             }
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
                           />
                         </div>
                         <div className="col-span-2">
-                          <label className="mb-1 block text-xs text-slate-500">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             Subtotal
                           </label>
-                          <p className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm font-medium text-slate-700">
+                          <p className="rounded-md border border-border bg-muted px-2 py-1.5 text-sm font-medium text-foreground">
                             ${' '}
                             {(
                               (Number(l.precioUnitario) || 0) *
@@ -509,21 +619,22 @@ export default function ComprasPage() {
                           </p>
                         </div>
                         <div className="col-span-1">
-                          <label className="mb-1 block text-xs text-slate-500">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             &nbsp;
                           </label>
-                          <button
+                          <Button
                             type="button"
+                            variant="destructive"
+                            size="icon-sm"
                             onClick={() => removeLinea(idx)}
                             disabled={lineas.length <= 1}
-                            className="w-full rounded-md border border-red-300 px-2 py-1.5 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50"
                           >
-                            ✕
-                          </button>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                       <div className="mt-2">
-                        <label className="mb-1 block text-xs text-slate-500">
+                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                           Notas (opcional)
                         </label>
                         <input
@@ -533,7 +644,7 @@ export default function ComprasPage() {
                             updateLinea(idx, 'notas', e.target.value)
                           }
                           placeholder="Observaciones de la línea..."
-                          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
                         />
                       </div>
                     </div>
@@ -542,65 +653,66 @@ export default function ComprasPage() {
               </div>
 
               {/* Totales */}
-              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-900">Subtotal</p>
-                  <p className="text-lg font-bold text-blue-900">
-                    $ {subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-900">IVA (16%)</p>
-                  <p className="text-lg font-bold text-blue-900">
-                    $ {iva.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-900">Total</p>
-                  <p className="text-lg font-bold text-blue-900">
-                    $ {total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </p>
+              <div className="rounded-lg border border-brand/20 bg-brand-muted p-3">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Subtotal</p>
+                    <p className="text-lg font-bold text-foreground">
+                      $ {subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">IVA (16%)</p>
+                    <p className="text-lg font-bold text-foreground">
+                      $ {iva.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total</p>
+                    <p className="text-lg font-bold text-brand">
+                      $ {total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Notas generales
                 </label>
-                <textarea
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                  placeholder="Condiciones, observaciones..."
-                />
+                <div className="relative">
+                  <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <textarea
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                    placeholder="Condiciones, observaciones..."
+                  />
+                </div>
               </div>
 
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-destructive/20 bg-destructive-muted px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
 
               <div className="flex justify-end gap-3 pt-4">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowModal(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+                  loading={saving}
                 >
-                  {saving
-                    ? 'Guardando...'
-                    : editing
-                    ? 'Actualizar'
-                    : 'Crear Orden'}
-                </button>
+                  {editing ? 'Actualizar' : 'Crear Orden'}
+                </Button>
               </div>
             </form>
           </div>
@@ -610,21 +722,42 @@ export default function ComprasPage() {
   );
 }
 
-function StatusBadge({ estatus }: { estatus: string }) {
-  const styles: Record<string, string> = {
-    pendiente: 'bg-yellow-100 text-yellow-700',
-    aprobada: 'bg-blue-100 text-blue-700',
-    en_produccion: 'bg-purple-100 text-purple-700',
-    completada: 'bg-green-100 text-green-700',
-    cancelada: 'bg-red-100 text-red-700',
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: 'brand' | 'warning' | 'success' | 'danger' }) {
+  const colorMap = {
+    brand: 'text-brand bg-brand-muted',
+    warning: 'text-warning bg-warning-muted',
+    success: 'text-success bg-success-muted',
+    danger: 'text-danger bg-danger-muted',
   };
+
   return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-        styles[estatus] || 'bg-slate-100 text-slate-700'
-      }`}
-    >
-      {estatus}
-    </span>
+    <Card className="card-premium">
+      <CardContent className="flex items-center gap-4 p-4">
+        <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${colorMap[color]}`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold text-foreground">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
+}
+
+function StatusBadge({ estatus }: { estatus: string }) {
+  const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'; label: string }> = {
+    pendiente: { variant: 'warning', label: 'Pendiente' },
+    PENDIENTE: { variant: 'warning', label: 'Pendiente' },
+    aprobada: { variant: 'default', label: 'Aprobada' },
+    APROBADA: { variant: 'default', label: 'Aprobada' },
+    en_produccion: { variant: 'secondary', label: 'En Producción' },
+    completada: { variant: 'success', label: 'Completada' },
+    cancelada: { variant: 'destructive', label: 'Cancelada' },
+    rechazada: { variant: 'destructive', label: 'Rechazada' },
+  };
+
+  const { variant, label } = config[estatus] || { variant: 'outline' as const, label: estatus };
+
+  return <Badge variant={variant}>{label}</Badge>;
 }

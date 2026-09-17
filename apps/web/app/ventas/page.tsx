@@ -3,6 +3,37 @@
 import { useEffect, useState, FormEvent, useCallback } from 'react';
 import { get, post, put, del, ApiError } from '@/lib/api';
 import type { Venta, VentaItem, VentaListResponse, Cliente, Sucursal } from '@/types';
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  X,
+  Package,
+  DollarSign,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Inbox,
+  Loader2,
+  ShoppingCart,
+  TrendingUp,
+  FileText,
+  AlertCircle,
+  Receipt,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/Card';
+import {
+  TableContainer,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
 
 interface VentaItemForm {
   piezaNombre: string;
@@ -32,6 +63,37 @@ const ESTATUS_OPTIONS = [
   { value: 'COMPLETADA', label: 'Completada' },
   { value: 'CANCELADA', label: 'Cancelada' },
 ];
+
+function getStatusVariant(estatus: string): 'default' | 'warning' | 'success' | 'destructive' | 'secondary' {
+  switch (estatus) {
+    case 'COTIZACION':
+      return 'secondary';
+    case 'PENDIENTE':
+      return 'warning';
+    case 'APROBADA':
+      return 'default';
+    case 'EN_PRODUCCION':
+      return 'default';
+    case 'COMPLETADA':
+      return 'success';
+    case 'CANCELADA':
+      return 'destructive';
+    default:
+      return 'default';
+  }
+}
+
+function getStatusLabel(estatus: string): string {
+  const labels: Record<string, string> = {
+    COTIZACION: 'Cotización',
+    PENDIENTE: 'Pendiente',
+    APROBADA: 'Aprobada',
+    EN_PRODUCCION: 'En Producción',
+    COMPLETADA: 'Completada',
+    CANCELADA: 'Cancelada',
+  };
+  return labels[estatus] || estatus;
+}
 
 export default function VentasPage() {
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -229,159 +291,249 @@ export default function VentasPage() {
     loadVentas(1, search);
   }
 
+  // Stats calculations
+  const statsTotal = meta?.total ?? ventas.length;
+  const statsPendientes = ventas.filter((v) => v.estatus === 'PENDIENTE').length;
+  const statsCompletadas = ventas.filter((v) => v.estatus === 'COMPLETADA').length;
+  const statsCanceladas = ventas.filter((v) => v.estatus === 'CANCELADA').length;
+
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Ventas</h1>
-          <p className="text-sm text-slate-600">Pedidos de venta y cotizaciones</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Ventas</h1>
+          <p className="text-sm text-muted-foreground">Pedidos de venta y cotizaciones</p>
         </div>
-        <button
+        <Button
           onClick={openNew}
           disabled={clientes.length === 0}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+          size="sm"
+          className="gap-2"
         >
+          <Plus className="h-4 w-4" />
           Nueva Venta
-        </button>
+        </Button>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <input
-          type="text"
-          placeholder="Buscar por folio o cliente..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-        />
-        <button
-          onClick={handleSearch}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-        >
-          Buscar
-        </button>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card className="card-premium">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Total
+              </p>
+              <p className="text-xl font-bold text-foreground">{statsTotal}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-premium">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-warning-muted text-warning">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Pendientes
+              </p>
+              <p className="text-xl font-bold text-foreground">{statsPendientes}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-premium">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-success-muted text-success">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Completadas
+              </p>
+              <p className="text-xl font-bold text-foreground">{statsCompletadas}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-premium">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-danger-muted text-danger">
+              <XCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Canceladas
+              </p>
+              <p className="text-xl font-bold text-foreground">{statsCanceladas}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Alerts */}
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive-muted px-4 py-3 text-sm text-destructive animate-fade-in">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          {success}
+        <div className="flex items-center gap-3 rounded-xl border border-success/20 bg-success-muted px-4 py-3 text-sm text-success animate-fade-in">
+          <CheckCircle className="h-4 w-4 shrink-0" />
+          <span>{success}</span>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-3">Folio</th>
-              <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3">Estatus</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  Cargando...
-                </td>
-              </tr>
-            ) : ventas.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  No hay ventas registradas
-                </td>
-              </tr>
-            ) : (
-              ventas.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{v.folio}</td>
-                  <td className="px-4 py-3">
-                    {v.cliente?.razonSocial || v.clienteId}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {new Date(v.fecha).toLocaleDateString('es-MX')}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    {v.moneda === 'USD' ? '$' : '$'}
-                    {Number(v.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}{' '}
-                    <span className="text-slate-400">{v.moneda}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge estatus={v.estatus} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => openEdit(v)}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(v.id)}
-                        className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-50"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        {meta && (
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            <span>
-              Mostrando {ventas.length} de {meta.total} ventas
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="rounded-md border border-slate-300 px-3 py-1 transition hover:bg-white disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-                className="rounded-md border border-slate-300 px-3 py-1 transition hover:bg-white disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Search Bar */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar por folio o cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-4 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+        <Button variant="outline" size="sm" onClick={handleSearch} className="gap-2">
+          <Search className="h-3.5 w-3.5" />
+          Buscar
+        </Button>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="mb-4 text-lg font-bold text-slate-900">
-              {editing ? 'Editar Venta' : 'Nueva Venta'}
-            </h2>
+      {/* Table */}
+      <TableContainer>
+        {loading ? (
+          <LoadingSkeleton />
+        ) : ventas.length === 0 ? (
+          <EmptyState onNew={openNew} hasClientes={clientes.length > 0} />
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Folio</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Estatus</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ventas.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium text-foreground">{v.folio}</TableCell>
+                    <TableCell>{v.cliente?.razonSocial || v.clienteId}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(v.fecha).toLocaleDateString('es-MX')}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ${' '}
+                      {Number(v.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}{' '}
+                      <span className="text-muted-foreground">{v.moneda}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(v.estatus)}>
+                        {getStatusLabel(v.estatus)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon-sm"
+                          onClick={() => openEdit(v)}
+                          title="Editar"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon-sm"
+                          onClick={() => handleDelete(v.id)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            {/* Pagination */}
+            {meta && (
+              <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm">
+                <span className="text-muted-foreground">
+                  Mostrando {ventas.length} de {meta.total} ventas
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                    disabled={page >= meta.totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </TableContainer>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-3xl rounded-xl bg-card p-6 shadow-2xl ring-1 ring-foreground/10 max-h-[90vh] overflow-y-auto animate-fade-up">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  {editing ? 'Editar Venta' : 'Nueva Venta'}
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setShowModal(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Cliente *
                   </label>
                   <select
                     required
                     value={clienteId}
                     onChange={(e) => setClienteId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring/30"
                   >
                     <option value="">Seleccionar cliente...</option>
                     {clientes.map((c) => (
@@ -392,13 +544,13 @@ export default function VentasPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Sucursal
                   </label>
                   <select
                     value={sucursalId}
                     onChange={(e) => setSucursalId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring/30"
                   >
                     <option value="">Seleccionar sucursal...</option>
                     {sucursales.map((s) => (
@@ -410,22 +562,22 @@ export default function VentasPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Moneda
                   </label>
                   <select
                     value={moneda}
                     onChange={(e) => setMoneda(e.target.value as 'MXN' | 'USD')}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring/30"
                   >
                     <option value="MXN">MXN - Peso Mexicano</option>
                     <option value="USD">USD - Dólar</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Tipo de cambio
                   </label>
                   <input
@@ -435,25 +587,25 @@ export default function VentasPage() {
                     value={tipoCambio}
                     onChange={(e) => setTipoCambio(e.target.value)}
                     placeholder={moneda === 'USD' ? 'Ej: 17.50' : '1.00'}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Fecha de entrega
                 </label>
                 <input
                   type="date"
                   value={fechaEntrega}
                   onChange={(e) => setFechaEntrega(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Condiciones de pago
                 </label>
                 <textarea
@@ -461,12 +613,12 @@ export default function VentasPage() {
                   onChange={(e) => setCondicionesPago(e.target.value)}
                   rows={2}
                   placeholder="Ej: 30 días, 50% anticipo..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Notas
                 </label>
                 <textarea
@@ -474,19 +626,19 @@ export default function VentasPage() {
                   onChange={(e) => setNotas(e.target.value)}
                   rows={2}
                   placeholder="Observaciones generales..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
               </div>
 
               {editing && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Estatus
                   </label>
                   <select
                     value={estatus}
                     onChange={(e) => setEstatus(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring/30"
                   >
                     {ESTATUS_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -499,28 +651,31 @@ export default function VentasPage() {
 
               {/* Items */}
               <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-700">
+                <div className="mb-3 flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Líneas de producto
                   </label>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={addItem}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                    className="gap-1"
                   >
-                    + Agregar línea
-                  </button>
+                    <Plus className="h-3 w-3" />
+                    Agregar línea
+                  </Button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {items.map((it, idx) => (
                     <div
                       key={idx}
-                      className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                      className="rounded-lg border border-border bg-muted/50 p-3"
                     >
                       <div className="grid grid-cols-12 gap-2 items-end">
-                        <div className="col-span-4">
-                          <label className="mb-1 block text-xs text-slate-500">
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="mb-1 block text-xs text-muted-foreground">
                             Descripción *
                           </label>
                           <input
@@ -529,11 +684,11 @@ export default function VentasPage() {
                             value={it.piezaNombre}
                             onChange={(e) => updateItem(idx, 'piezaNombre', e.target.value)}
                             placeholder="Nombre/descripción"
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
                           />
                         </div>
-                        <div className="col-span-2">
-                          <label className="mb-1 block text-xs text-slate-500">
+                        <div className="col-span-4 sm:col-span-2">
+                          <label className="mb-1 block text-xs text-muted-foreground">
                             Cantidad
                           </label>
                           <input
@@ -543,22 +698,22 @@ export default function VentasPage() {
                             onChange={(e) =>
                               updateItem(idx, 'cantidad', Number(e.target.value))
                             }
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
                           />
                         </div>
-                        <div className="col-span-2">
-                          <label className="mb-1 block text-xs text-slate-500">
+                        <div className="col-span-4 sm:col-span-2">
+                          <label className="mb-1 block text-xs text-muted-foreground">
                             Unidad
                           </label>
                           <input
                             type="text"
                             value={it.unidad}
                             onChange={(e) => updateItem(idx, 'unidad', e.target.value)}
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
                           />
                         </div>
-                        <div className="col-span-3">
-                          <label className="mb-1 block text-xs text-slate-500">
+                        <div className="col-span-3 sm:col-span-3">
+                          <label className="mb-1 block text-xs text-muted-foreground">
                             Precio unitario
                           </label>
                           <input
@@ -569,25 +724,27 @@ export default function VentasPage() {
                             onChange={(e) =>
                               updateItem(idx, 'precioUnitario', Number(e.target.value))
                             }
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
                           />
                         </div>
                         <div className="col-span-1">
-                          <label className="mb-1 block text-xs text-slate-500">
+                          <label className="mb-1 block text-xs text-muted-foreground">
                             &nbsp;
                           </label>
-                          <button
+                          <Button
                             type="button"
+                            variant="destructive"
+                            size="icon-sm"
                             onClick={() => removeItem(idx)}
                             disabled={items.length <= 1}
-                            className="w-full rounded-md border border-red-300 px-2 py-1.5 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                            title="Eliminar línea"
                           >
-                            ✕
-                          </button>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                       <div className="mt-2">
-                        <label className="mb-1 block text-xs text-slate-500">
+                        <label className="mb-1 block text-xs text-muted-foreground">
                           Notas de línea
                         </label>
                         <input
@@ -595,7 +752,7 @@ export default function VentasPage() {
                           value={it.notas}
                           onChange={(e) => updateItem(idx, 'notas', e.target.value)}
                           placeholder="Observaciones de esta línea..."
-                          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                          className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
                         />
                       </div>
                     </div>
@@ -604,11 +761,13 @@ export default function VentasPage() {
               </div>
 
               {/* Totals */}
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="rounded-xl border border-primary/20 bg-primary-muted p-4">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-xs text-blue-700">Subtotal</p>
-                    <p className="text-lg font-bold text-blue-900">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Subtotal
+                    </p>
+                    <p className="text-lg font-bold text-foreground">
                       ${' '}
                       {calcSubtotal().toLocaleString('es-MX', {
                         minimumFractionDigits: 2,
@@ -616,8 +775,10 @@ export default function VentasPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-blue-700">IVA (16%)</p>
-                    <p className="text-lg font-bold text-blue-900">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      IVA (16%)
+                    </p>
+                    <p className="text-lg font-bold text-foreground">
                       ${' '}
                       {calcIva().toLocaleString('es-MX', {
                         minimumFractionDigits: 2,
@@ -625,8 +786,10 @@ export default function VentasPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-blue-700">Total</p>
-                    <p className="text-lg font-bold text-blue-900">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Total
+                    </p>
+                    <p className="text-lg font-bold text-foreground">
                       ${' '}
                       {calcTotal().toLocaleString('es-MX', {
                         minimumFractionDigits: 2,
@@ -637,30 +800,32 @@ export default function VentasPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive-muted px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-4">
-                <button
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowModal(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  disabled={saving}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+                  loading={saving}
+                  className="gap-2"
                 >
+                  {!saving && <FileText className="h-4 w-4" />}
                   {saving
                     ? 'Guardando...'
                     : editing
                     ? 'Actualizar'
                     : 'Crear Venta'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -670,30 +835,37 @@ export default function VentasPage() {
   );
 }
 
-function StatusBadge({ estatus }: { estatus: string }) {
-  const styles: Record<string, string> = {
-    COTIZACION: 'bg-slate-100 text-slate-700',
-    PENDIENTE: 'bg-yellow-100 text-yellow-700',
-    APROBADA: 'bg-green-100 text-green-700',
-    EN_PRODUCCION: 'bg-blue-100 text-blue-700',
-    COMPLETADA: 'bg-emerald-100 text-emerald-700',
-    CANCELADA: 'bg-red-100 text-red-700',
-  };
-  const labels: Record<string, string> = {
-    COTIZACION: 'Cotización',
-    PENDIENTE: 'Pendiente',
-    APROBADA: 'Aprobada',
-    EN_PRODUCCION: 'En Producción',
-    COMPLETADA: 'Completada',
-    CANCELADA: 'Cancelada',
-  };
+function LoadingSkeleton() {
   return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-        styles[estatus] || 'bg-slate-100 text-slate-700'
-      }`}
-    >
-      {labels[estatus] || estatus}
-    </span>
+    <div className="space-y-3 p-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4">
+          <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ onNew, hasClientes }: { onNew: () => void; hasClientes: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-up">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <Inbox className="h-8 w-8" />
+      </div>
+      <h3 className="text-base font-semibold text-foreground">No hay ventas registradas</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Crea tu primera venta para comenzar a gestionar pedidos y cotizaciones.
+      </p>
+      <Button onClick={onNew} disabled={!hasClientes} className="mt-4 gap-2">
+        <Plus className="h-4 w-4" />
+        Nueva Venta
+      </Button>
+    </div>
   );
 }
