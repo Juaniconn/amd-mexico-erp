@@ -35,7 +35,7 @@ export class CreateControlCalidadDto {
 export class UpdateControlCalidadDto {
   @IsString()
   @IsOptional()
-  @IsEnum(['aprobado', 'rechazado', 'rework'])
+  @IsEnum(['APROBADO', 'RECHAZADO', 'REWORK'])
   resultado?: string;
 
   @IsString()

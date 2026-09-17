@@ -69,7 +69,7 @@ export class CreateOrdenTrabajoDto {
 
   @IsString()
   @IsOptional()
-  @IsEnum(['baja', 'media', 'alta', 'urgente'])
+  @IsEnum(['BAJA', 'MEDIA', 'ALTA', 'URGENTE'])
   prioridad?: string;
 
   @IsString()
@@ -87,7 +87,7 @@ export class CreateOrdenTrabajoDto {
 export class UpdateOrdenTrabajoDto {
   @IsString()
   @IsOptional()
-  @IsEnum(['pendiente', 'en_produccion', 'calidad', 'completada', 'cancelada'])
+  @IsEnum(['PENDIENTE', 'EN_PRODUCCION', 'CALIDAD', 'COMPLETADA', 'CANCELADA'])
   estatus?: string;
 
   @IsString()
@@ -109,7 +109,7 @@ export class UpdateOperacionDto {
 
   @IsString()
   @IsOptional()
-  @IsEnum(['pendiente', 'en_proceso', 'completada', 'rechazada'])
+  @IsEnum(['PENDIENTE', 'EN_PROCESO', 'COMPLETADA', 'RECHAZADA'])
   estatus?: string;
 
   @IsString()

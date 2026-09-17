@@ -23,7 +23,7 @@ export class ProduccionService {
         piezaDescripcion: data.piezaDescripcion,
         cantidad: data.cantidad,
         unidad: data.unidad,
-        prioridad: (data.prioridad as any) || 'media',
+        prioridad: (data.prioridad as any) || 'MEDIA',
         notas: data.notas,
         estatus: 'PENDIENTE' as any,
         operaciones: data.operaciones

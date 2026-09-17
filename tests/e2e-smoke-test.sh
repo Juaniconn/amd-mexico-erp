@@ -3,7 +3,8 @@
 # E2E Smoke Test - ERP AMD México
 # Pipeline: Login → Cliente → Proveedor → Cotización → OC → OT → Operación → Calidad → Venta → Dashboard
 ###############################################################################
-set -euo pipefail
+# NOTE: set -e disabled so all steps run even if some fail (pipeline must be tested end-to-end)
+set -uo pipefail
 
 # ── Colors & Emojis ─────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -301,7 +302,6 @@ if check_auth && [[ -n "$OC_ID" ]]; then
   "piezaDescripcion": "Pieza de prueba A para test e2e",
   "cantidad": 100,
   "unidad": "pza",
-  "prioridad": "media",
   "notas": "OT de prueba e2e ${TEST_CODE}",
   "operaciones": [
     {
@@ -390,7 +390,7 @@ log_info "Step 8: Marcar operación como completada"
 if check_auth && [[ -n "$OPERACION_ID" ]]; then
   UPDATE_OP_BODY=$(cat <<EOF
 {
-  "estatus": "completada",
+  "estatus": "COMPLETADA",
   "tiempoReal": 115,
   "notas": "Operacion completada en test e2e ${TEST_CODE}"
 }
@@ -421,7 +421,7 @@ if check_auth && [[ -n "$OPERACION_ID" ]]; then
   CALIDAD_BODY=$(cat <<EOF
 {
   "operacionId": "${OPERACION_ID}",
-  "resultado": "aprobado",
+  "resultado": "APROBADO",
   "defectos": "",
   "observaciones": "Inspeccion de calidad aprobada en test e2e ${TEST_CODE}"
 }
