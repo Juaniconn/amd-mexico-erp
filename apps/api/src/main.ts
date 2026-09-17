@@ -18,9 +18,9 @@ async function bootstrap() {
     }),
   );
 
-  // CORS
+  // CORS - allow all origins via nginx reverse proxy
   app.enableCors({
-    origin: process.env.APP_URL || 'http://localhost:3000',
+    origin: true,
     credentials: true,
   });
 
