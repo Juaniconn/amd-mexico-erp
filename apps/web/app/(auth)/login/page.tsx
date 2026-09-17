@@ -37,7 +37,7 @@ export default function Login() {
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      router.push('/dashboard');
+      router.push('/');
     } catch (err) {
       setError('Error de conexión con el servidor');
     } finally {

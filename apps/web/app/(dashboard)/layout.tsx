@@ -67,17 +67,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <NavLink href="/dashboard">Dashboard</NavLink>
-          <NavLink href="/dashboard/clientes">Clientes</NavLink>
-          <NavLink href="/dashboard/cotizaciones">Cotizaciones</NavLink>
-          <NavLink href="/dashboard/ventas">Ventas</NavLink>
-          <NavLink href="/dashboard/produccion">Producción</NavLink>
-          <NavLink href="/dashboard/inventario">Inventario</NavLink>
-          <NavLink href="/dashboard/compras">Compras</NavLink>
-          <NavLink href="/dashboard/proveedores">Proveedores</NavLink>
-          <NavLink href="/dashboard/calidad">Calidad</NavLink>
-          <NavLink href="/dashboard/reportes">Reportes</NavLink>
-          <NavLink href="/dashboard/crm">CRM</NavLink>
+          <NavLink href="/">Dashboard</NavLink>
+          <NavLink href="/clientes">Clientes</NavLink>
+          <NavLink href="/cotizaciones">Cotizaciones</NavLink>
+          <NavLink href="/ventas">Ventas</NavLink>
+          <NavLink href="/produccion">Producción</NavLink>
+          <NavLink href="/inventario">Inventario</NavLink>
+          <NavLink href="/compras">Compras</NavLink>
+          <NavLink href="/proveedores">Proveedores</NavLink>
+          <NavLink href="/calidad">Calidad</NavLink>
+          <NavLink href="/reportes">Reportes</NavLink>
+          <NavLink href="/crm">CRM</NavLink>
         </nav>
 
         <div className="p-4 border-t border-slate-700">
