@@ -16,30 +16,38 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    try {
-      const res = await fetch(
-        `/api/auth/login`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        }
-      );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-      const data = await res.json();
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
-        setError(data.message || 'Error al iniciar sesión');
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || `Error ${res.status}: ${res.statusText}`);
         return;
       }
 
+      const data = await res.json();
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       router.push('/');
-    } catch (err) {
-      setError('Error de conexión con el servidor');
+      router.refresh();
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        setError('Tiempo de espera agotado. Verifica tu conexión.');
+      } else {
+        setError('Error de conexión con el servidor');
+      }
     } finally {
       setLoading(false);
     }
