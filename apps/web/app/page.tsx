@@ -25,59 +25,26 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for token in URL (from login redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
-    
-    if (urlToken) {
-      // Save token from URL to localStorage
-      localStorage.setItem('accessToken', urlToken);
-      // Clean URL
-      window.history.replaceState({}, '', '/');
-    }
-
-    // Check for token in cookies or localStorage
-    let token = localStorage.getItem('accessToken');
-    const cookieToken = document.cookie.split('; ').find(row => row.startsWith('accessToken='));
-    if (cookieToken && !token) {
-      token = cookieToken.split('=')[1];
-      localStorage.setItem('accessToken', token);
-    }
-    
+    // Simple auth check: just verify token exists in localStorage
+    const token = localStorage.getItem('accessToken');
     const storedUser = localStorage.getItem('user');
     
-    if (!token && !storedUser) {
-      // Try to get user from cookie
-      const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
-      if (userCookie) {
-        try {
-          const userData = JSON.parse(decodeURIComponent(userCookie.split('=')[1]));
-          setUser(userData);
-          setLoading(false);
-          return;
-        } catch (e) {
-          // Invalid cookie, redirect to login
-        }
-      }
-      
+    if (!token || !storedUser) {
       router.push('/login');
       return;
     }
 
-    // Use Next.js proxy instead of direct backend call
-    fetch('/api/auth/me')
-      .then((res) => {
-        if (!res.ok) throw new Error('Auth failed');
-        return res.json();
-      })
-      .then((u) => setUser(u))
-      .catch(() => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        router.push('/login');
-      })
-      .finally(() => setLoading(false));
+    // Parse user from localStorage
+    try {
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
+    } catch (e) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   if (loading) {

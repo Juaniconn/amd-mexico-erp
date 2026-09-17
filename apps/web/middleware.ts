@@ -13,6 +13,12 @@ export async function middleware(request: NextRequest) {
       const headers = new Headers(request.headers);
       headers.set('host', new URL(API_URL).host);
       
+      // Extract token from cookies and add Authorization header
+      const token = request.cookies.get('accessToken')?.value;
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      
       const res = await fetch(apiUrl, {
         method: request.method,
         headers,
