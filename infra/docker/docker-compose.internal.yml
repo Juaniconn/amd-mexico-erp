@@ -17,6 +17,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - erp-network
 
   redis:
     image: redis:7-alpine
@@ -32,6 +34,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - erp-network
 
   minio:
     image: quay.io/minio/minio:RELEASE.2024-09-13T20-26-02Z
@@ -51,6 +55,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - erp-network
 
   api:
     build:
@@ -80,6 +86,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    networks:
+      - erp-network
 
   web:
     build:
@@ -88,12 +96,18 @@ services:
     container_name: amd-erp-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: ""
+      NEXT_PUBLIC_API_URL: http://api:3001
       NODE_ENV: production
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
       - api
+    networks:
+      - erp-network
+
+networks:
+  erp-network:
+    driver: bridge
 
 volumes:
   postgres_data:
