@@ -68,10 +68,12 @@ export interface Cotizacion {
   fecha: string;
   validez: number;
   moneda: string;
+  tipoCambio?: number | string | null;
   subtotal: number;
   iva: number;
   total: number;
   estatus: string;
+  notas?: string;
   createdAt: string;
 }
 
@@ -201,6 +203,24 @@ export interface DetalleCotizacion {
 export interface CotizacionWithParts extends Cotizacion {
   detalles: DetalleCotizacion[];
   ordenesTrabajo?: OrdenTrabajo[];
+  cliente?: {
+    id: string;
+    codigo: string;
+    razonSocial: string;
+    rfc?: string;
+    ciudad?: string;
+    estado?: string;
+    contacto?: string;
+    email?: string;
+    telefono?: string;
+    monedaPref?: string;
+  };
+  creador?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+    email: string;
+  };
 }
 
 export interface OrdenTrabajo {

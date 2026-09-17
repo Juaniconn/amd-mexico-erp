@@ -138,6 +138,14 @@ export class CotizacionesService {
       include: {
         cliente: true,
         detalles: true,
+        creador: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            email: true,
+          },
+        },
       },
     });
 

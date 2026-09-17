@@ -20,6 +20,10 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  Wrench,
+  Upload,
+  FileCheck,
+  Clock,
 } from 'lucide-react';
 
 const modules = [
@@ -29,12 +33,16 @@ const modules = [
   { section: 'Operaciones', items: [
     { href: '/clientes', icon: Users, label: 'Clientes' },
     { href: '/cotizaciones', icon: FileText, label: 'Cotizaciones' },
+    { href: '/cotizaciones/[id]', icon: FileText, label: 'Detalle Cotización' },
   ]},
   { section: 'Producción', items: [
     { href: '/produccion', icon: Hammer, label: 'Producción' },
     { href: '/inventario', icon: Package, label: 'Inventario' },
     { href: '/compras', icon: ShoppingCart, label: 'Compras' },
     { href: '/proveedores', icon: Factory, label: 'Proveedores' },
+  ]},
+  { section: 'Ingeniería', items: [
+    { href: '/ingenieria', icon: Wrench, label: 'Diseño' },
   ]},
   { section: 'Calidad', items: [
     { href: '/calidad', icon: CheckCircle, label: 'Calidad' },

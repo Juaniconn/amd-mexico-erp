@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,7 @@ export default function CotizacionesPage() {
 }
 
 function CotizacionesContent() {
+  const router = useRouter();
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [meta, setMeta] = useState<any>(null);
@@ -352,7 +354,14 @@ function CotizacionesContent() {
             ) : (
               cotizaciones.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.folio}</TableCell>
+                  <TableCell className="font-medium">
+                    <button
+                      onClick={() => router.push(`/cotizaciones/${c.id}`)}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      {c.folio}
+                    </button>
+                  </TableCell>
                   <TableCell>{c.razonSocial || c.clienteId}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(c.createdAt).toLocaleDateString('es-MX')}
