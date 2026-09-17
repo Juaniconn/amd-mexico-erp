@@ -2,7 +2,7 @@ FROM node:20-bookworm
 
 WORKDIR /app
 
-RUN npm install -g pnpm prisma@5
+RUN npm install -g pnpm
 
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
@@ -13,7 +13,9 @@ RUN pnpm install --no-frozen-lockfile
 COPY apps/api ./apps/api/
 COPY packages/shared ./packages/shared/
 
-RUN prisma generate --schema apps/api/prisma/schema.prisma
+# Install prisma@6 locally (matches schema) and generate client
+RUN pnpm --filter @amd/api add prisma@6.7.0 && pnpm --filter @amd/api add @prisma/client@6.7.0
+RUN cd apps/api && pnpm exec prisma generate
 RUN pnpm --filter @amd/api build
 
 EXPOSE 3001
