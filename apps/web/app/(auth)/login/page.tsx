@@ -6,8 +6,8 @@ import Link from 'next/link';
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@amd-mexico.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,18 +16,12 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -40,14 +34,10 @@ export default function Login() {
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      router.push('/');
-      router.refresh();
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        setError('Tiempo de espera agotado. Verifica tu conexión.');
-      } else {
-        setError('Error de conexión con el servidor');
-      }
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Error de conexión con el servidor. Verifica tu conexión.');
     } finally {
       setLoading(false);
     }
