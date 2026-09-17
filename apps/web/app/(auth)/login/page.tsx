@@ -15,12 +15,16 @@ export default function Login() {
     setError('');
     setLoading(true);
 
+    console.log('Login attempt:', { email, password });
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+
+      console.log('Login response status:', res.status);
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -29,10 +33,11 @@ export default function Login() {
       }
 
       const data = await res.json();
+      console.log('Login success, user:', data.user?.email);
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
-      router.push('/');
+      window.location.href = '/';
     } catch (err) {
       console.error('Login error:', err);
       setError('Error de conexión con el servidor. Verifica tu conexión.');
