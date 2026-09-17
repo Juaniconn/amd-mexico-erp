@@ -32,7 +32,7 @@ export default function Login() {
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
-      router.push('/dashboard');
+      router.push('/');
     } catch (err) {
       console.error('Login error:', err);
       setError('Error de conexión con el servidor. Verifica tu conexión.');

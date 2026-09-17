@@ -17,3 +17,14 @@ export default function RootLayout({
     </html>
   );
 }
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="block rounded-lg px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+    >
+      {children}
+    </Link>
+  );
+}
