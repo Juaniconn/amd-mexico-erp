@@ -1,19 +1,14 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@amd-mexico.com');
+  const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -44,22 +39,6 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (!mounted) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4">
-        <div className="w-full max-w-md rounded-2xl bg-white/10 p-8 shadow-2xl backdrop-blur-lg border border-white/20">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-white">AMD México</h1>
-            <p className="mt-2 text-blue-200">Sistema de Gestión Industrial</p>
-          </div>
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
