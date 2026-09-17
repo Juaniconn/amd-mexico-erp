@@ -25,7 +25,15 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simple auth check: just verify token exists in localStorage
+    // Check for token in URL (from login redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    
+    if (urlToken) {
+      localStorage.setItem('accessToken', urlToken);
+      window.history.replaceState({}, '', '/');
+    }
+
     const token = localStorage.getItem('accessToken');
     const storedUser = localStorage.getItem('user');
     
@@ -34,17 +42,15 @@ export default function Home() {
       return;
     }
 
-    // Parse user from localStorage
-    try {
-      const userData = JSON.parse(storedUser);
-      setUser(userData);
-    } catch (e) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      router.push('/login');
-    } finally {
-      setLoading(false);
-    }
+    get<User>('/api/auth/me')
+      .then((u) => setUser(u))
+      .catch(() => {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        router.push('/login');
+      })
+      .finally(() => setLoading(false));
   }, [router]);
 
   if (loading) {
