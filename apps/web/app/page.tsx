@@ -42,15 +42,16 @@ export default function Home() {
       return;
     }
 
-    get<User>('/api/auth/me')
-      .then((u) => setUser(u))
-      .catch(() => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        router.push('/login');
-      })
-      .finally(() => setLoading(false));
+    try {
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
+    } catch (e) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
   if (loading) {
