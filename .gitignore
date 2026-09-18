@@ -38,3 +38,4 @@ docker-data/
 postgres-data/
 redis-data/
 minio-data/
+.env.docker

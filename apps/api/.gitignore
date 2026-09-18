@@ -1,5 +1,5 @@
 # Prisma
-prisma/
+prisma/generated/
 
 # Build outputs
 dist/
