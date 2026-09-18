@@ -39,3 +39,4 @@ postgres-data/
 redis-data/
 minio-data/
 .env.docker
+.env.local.generated.json

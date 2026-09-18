@@ -42,7 +42,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.API_PORT || 3001;
-  await app.listen(port);
+  await app.listen(port, '127.0.0.1');
   console.log(`🚀 API corriendo en http://localhost:${port}`);
   console.log(`📖 Swagger en http://localhost:${port}/api/docs`);
 }
