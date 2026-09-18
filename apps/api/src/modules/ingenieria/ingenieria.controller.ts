@@ -11,6 +11,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Express } from 'express';
 import { IngenieriaService } from './ingenieria.service';
 import { CreateIngenieriaProyectoDto } from './dto/create-ingenieria-proyecto.dto';
 import { UpdateIngenieriaProyectoDto } from './dto/update-ingenieria-proyecto.dto';
@@ -74,7 +75,7 @@ export class IngenieriaController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadPlano(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any, // @types/multer no disponible; simplificado para build
     @Body('parteNumero') parteNumero: string,
     @Body('version') version?: string,
   ) {
