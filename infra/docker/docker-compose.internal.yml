@@ -30,21 +30,6 @@ services:
     networks:
       - amd-erp-net
 
-  web:
-    image: docker:latest
-    container_name: amd-erp-web-docker
-    restart: always
-    volumes:
-      - /home/ubuntu/data/projets/amd_web_app/apps/web/next:/app:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: docker run --rm -v /home/ubuntu/data/projets/amd_web_app/apps/web/next:/app/next -w /app node:20-bookworm node node_modules/next/dist/bin/next start -p 3000
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - api
-    networks:
-      - amd-erp-net
-
   db:
     image: postgres:16-alpine
     container_name: amd-erp-db
