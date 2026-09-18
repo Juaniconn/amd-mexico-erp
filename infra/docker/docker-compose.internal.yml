@@ -1,4 +1,50 @@
 services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    container_name: amd-erp-api
+    restart: always
+    environment:
+      NODE_ENV: production
+      API_PORT: 3001
+      DATABASE_URL: postgresql://erp:ykf3i1drkq7fbjz3wvifi3n3@db:5432/erp_db
+      REDIS_URL: redis://:redis_pass_2026@redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: vcsmvbw56l8rzlz6uzme
+      JWT_SECRET: 03hleui0fjny66p58tvm0u3od1nbqkn5kgchp1z22yzfjsg4u3palwu3yk7eb69d
+      JWT_EXPIRES_IN: 8h
+      JWT_REFRESH_SECRET: retpqhx7xhggkc95q636o1001cp4j4y4qwq7v98orbcgrh50xyi8f9n84iokmjlb
+      JWT_REFRESH_EXPIRES_IN: 7d
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - amd-erp-net
+
+  web:
+    image: docker:latest
+    container_name: amd-erp-web-docker
+    restart: always
+    volumes:
+      - /home/ubuntu/data/projets/amd_web_app/apps/web/next:/app:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: docker run --rm -v /home/ubuntu/data/projets/amd_web_app/apps/web/next:/app/next -w /app node:20-bookworm node node_modules/next/dist/bin/next start -p 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
+    networks:
+      - amd-erp-net
+
   db:
     image: postgres:16-alpine
     container_name: amd-erp-db

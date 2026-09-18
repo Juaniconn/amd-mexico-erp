@@ -2,8 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tailwind theme tokens — OKLCH color space */
-@theme inline {
+/* Tailwind theme tokens — OKLCH color space (Tailwind 3.4 compatible) */
+:root {
   --color-background: oklch(0.98 0.004 80);
   --color-foreground: oklch(0.18 0.02 250);
   --color-card: oklch(1 0 0);

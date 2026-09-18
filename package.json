@@ -2,7 +2,7 @@
   "name": "amd-web-app",
   "version": "0.1.0",
   "private": true,
-  "description": "ERP de manufactura — AMD México (Ciudad Juárez, Guadalajara, El Paso TX)",
+  "description": "ERP de manufactura \u2014 AMD M\u00e9xico (Ciudad Ju\u00e1rez, Guadalajara, El Paso TX)",
   "scripts": {
     "dev": "pnpm --filter api dev & pnpm --filter web dev",
     "dev:api": "pnpm --filter api dev",
@@ -17,5 +17,17 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@nestjs/core",
+      "@nestjs/platform-express",
+      "prisma",
+      "@prisma/client",
+      "bcryptjs",
+      "class-validator",
+      "class-transformer"
+    ]
   }
 }

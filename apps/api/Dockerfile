@@ -4,18 +4,20 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-COPY package.json pnpm-workspace.yaml ./
+# Copiar configuración de pnpm y workspaces
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY .npmrc /root/.npmrc
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
-COPY apps/api ./apps/api/
+
+COPY apps/api ./apps/api
 COPY packages/shared ./packages/shared/
 
-# Install prisma@6 locally (matches schema) and generate client
-RUN pnpm --filter @amd/api add prisma@6.7.0 && pnpm --filter @amd/api add @prisma/client@6.7.0
-RUN cd apps/api && pnpm exec prisma generate
+# Prisma client se genera en el paso de build con --ignore-scripts
+RUN cd apps/api && npx prisma generate --schema prisma/schema.prisma
 RUN pnpm --filter @amd/api build
 
 EXPOSE 3001
