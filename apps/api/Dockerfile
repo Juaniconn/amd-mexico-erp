@@ -18,6 +18,9 @@ COPY packages/shared ./packages/shared/
 
 # Prisma client se genera en el paso de build con --ignore-scripts
 RUN cd apps/api && npx prisma generate --schema prisma/schema.prisma
+
+# Set DATABASE_URL to localhost for container runtime (overrides .env)
+ENV DATABASE_URL=postgresql://erp:${POSTGRES_PASSWORD:-erp_password}@127.0.0.1:5432/erp_db
 RUN pnpm --filter @amd/api build
 
 EXPOSE 3001
