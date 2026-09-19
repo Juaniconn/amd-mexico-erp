@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
+import { StatCard, StatGrid } from '@/components/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { get } from '@/lib/api';
 import {
@@ -13,23 +14,14 @@ import {
   Package,
   Truck,
   Settings,
-  TrendingUp,
-  TrendingDown,
   Plus,
-  Activity,
   AlertTriangle,
   CheckCircle2,
   Clock,
   ArrowRight,
+  Activity,
+  Bell,
 } from 'lucide-react';
-
-export default function Home() {
-  return (
-    <AppLayout>
-      <DashboardContent />
-    </AppLayout>
-  );
-}
 
 interface StatData {
   clientes: number;
@@ -39,6 +31,33 @@ interface StatData {
   materiales: number;
   proveedores: number;
   operaciones: number;
+}
+
+interface ActivityItem {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconBg: string;
+  iconColor: string;
+  text: string;
+  time: string;
+}
+
+interface AlertItem {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  desc: string;
+  severity: 'critica' | 'alta' | 'media' | 'baja';
+}
+
+export default function Home() {
+  return (
+    <AppLayout>
+      <DashboardContent />
+    </AppLayout>
+  );
 }
 
 function DashboardContent() {
@@ -53,12 +72,25 @@ function DashboardContent() {
     operaciones: 0,
   });
   const [greeting, setGreeting] = useState('Buenos días');
+  const [userName, setUserName] = useState('AMD México');
 
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Buenos días');
     else if (hour < 18) setGreeting('Buenas tardes');
     else setGreeting('Buenas noches');
+
+    // Load user name from localStorage
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        const name = user?.name || user?.nombre || user?.email || 'AMD México';
+        setUserName(name);
+      }
+    } catch {
+      // use default
+    }
   }, []);
 
   useEffect(() => {
@@ -89,13 +121,13 @@ function DashboardContent() {
   }, []);
 
   const statCards = [
-    { key: 'clientes' as const, title: 'Clientes', icon: Users, trend: 12, color: 'text-brand' },
-    { key: 'cotizaciones' as const, title: 'Cotizaciones', icon: FileText, trend: 8, color: 'text-accent-light' },
-    { key: 'ordenesCompra' as const, title: 'Órdenes Compra', icon: ShoppingCart, trend: -3, color: 'text-success' },
-    { key: 'ordenesTrabajo' as const, title: 'Órdenes Trabajo', icon: Wrench, trend: 5, color: 'text-warning' },
-    { key: 'materiales' as const, title: 'Materiales', icon: Package, trend: 0, color: 'text-brand' },
-    { key: 'proveedores' as const, title: 'Proveedores', icon: Truck, trend: 2, color: 'text-accent-light' },
-    { key: 'operaciones' as const, title: 'Operaciones', icon: Settings, trend: -1, color: 'text-success' },
+    { key: 'clientes' as const, title: 'Clientes', icon: Users, variant: 'brand' as const },
+    { key: 'cotizaciones' as const, title: 'Cotizaciones', icon: FileText, variant: 'default' as const },
+    { key: 'ordenesCompra' as const, title: 'Órdenes Compra', icon: ShoppingCart, variant: 'success' as const },
+    { key: 'ordenesTrabajo' as const, title: 'Órdenes Trabajo', icon: Wrench, variant: 'warning' as const },
+    { key: 'materiales' as const, title: 'Materiales', icon: Package, variant: 'default' as const },
+    { key: 'proveedores' as const, title: 'Proveedores', icon: Truck, variant: 'default' as const },
+    { key: 'operaciones' as const, title: 'Operaciones', icon: Settings, variant: 'success' as const },
   ];
 
   return (
@@ -104,10 +136,17 @@ function DashboardContent() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {greeting}, <span className="text-brand">AMD México</span>
+            {greeting},{' '}
+            <span className="text-brand">{userName}</span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Resumen de operaciones • {new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            Resumen de operaciones •{' '}
+            {new Date().toLocaleDateString('es-MX', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
           </p>
         </div>
         <button
@@ -119,18 +158,20 @@ function DashboardContent() {
         </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <StatCard
-            key={stat.key}
-            title={stat.title}
-            value={stats[stat.key]}
-            icon={stat.icon}
-            trend={stat.trend}
-            color={stat.color}
-          />
-        ))}
+      {/* KPI Grid using StatCards */}
+      <div>
+        <h2 className="section-title mb-3">Métricas Principales</h2>
+        <StatGrid cols={4}>
+          {statCards.map((stat) => (
+            <StatCard
+              key={stat.key}
+              title={stat.title}
+              value={stats[stat.key]}
+              icon={<stat.icon className="h-5 w-5" />}
+              variant={stat.variant}
+            />
+          ))}
+        </StatGrid>
       </div>
 
       {/* Activity & Alerts */}
@@ -145,118 +186,150 @@ function DashboardContent() {
   );
 }
 
-interface StatCardProps {
-  title: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  trend: number;
-  color: string;
-}
-
-function StatCard({ title, value, icon: Icon, trend, color }: StatCardProps) {
-  return (
-    <Card className="card-premium group relative overflow-hidden p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            {title}
-          </p>
-          <p className="text-2xl font-bold tracking-tight">{value.toLocaleString('es-MX')}</p>
-        </div>
-        <div className="rounded-lg bg-muted p-2 transition-colors group-hover:bg-brand/10">
-          <Icon className={`h-5 w-5 ${color}`} />
-        </div>
-      </div>
-      <div className="mt-3 flex items-center gap-1.5">
-        {trend !== 0 && (
-          trend > 0 ? (
-            <TrendingUp className="h-3.5 w-3.5 text-success" />
-          ) : (
-            <TrendingDown className="h-3.5 w-3.5 text-danger" />
-          )
-        )}
-        <span className={`text-xs font-medium ${trend > 0 ? 'text-success' : trend < 0 ? 'text-danger' : 'text-muted-foreground'}`}>
-          {trend > 0 ? '+' : ''}{trend}% vs mes anterior
-        </span>
-      </div>
-    </Card>
-  );
-}
-
 function RecentActivityCard() {
-  const activities = [
-    { icon: CheckCircle2, color: 'text-success bg-success-muted', text: 'Cotización #1042 aprobada', time: 'Hace 5 min' },
-    { icon: Package, color: 'text-brand bg-brand-muted', text: 'Orden de trabajo #892 completada', time: 'Hace 23 min' },
-    { icon: Users, color: 'text-accent-light bg-accent-muted', text: 'Nuevo cliente registrado: TechCorp', time: 'Hace 1 hora' },
-    { icon: ShoppingCart, color: 'text-warning bg-warning-muted', text: 'Orden de compra #567 creada', time: 'Hace 2 horas' },
-  ];
+  // Try to load recent activities from localStorage
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('recentActivities');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setActivities(parsed);
+          return;
+        }
+      }
+    } catch {
+      // fall through to empty
+    }
+    // Show empty state when no real data exists
+    setActivities([]);
+  }, []);
 
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Actividad Reciente</CardTitle>
-        <button className="text-xs font-medium text-brand hover:text-brand/80 transition-colors">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-brand" />
+          <CardTitle>Actividad Reciente</CardTitle>
+        </div>
+        <button className="text-xs font-medium text-brand transition-colors hover:text-brand/80">
           Ver todo
         </button>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {activities.map((activity, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <div className={`mt-0.5 rounded-lg p-1.5 ${activity.color}`}>
-              <activity.icon className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-foreground">{activity.text}</p>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                {activity.time}
-              </p>
-            </div>
+      <CardContent>
+        {activities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Clock className="mb-2 h-8 w-8 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">
+              Sin actividad reciente
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Las acciones aparecerán aquí
+            </p>
           </div>
-        ))}
+        ) : (
+          <div className="space-y-4">
+            {activities.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3">
+                <div className={`mt-0.5 rounded-lg p-1.5 ${activity.iconBg}`}>
+                  <activity.icon className={`h-3.5 w-3.5 ${activity.iconColor}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-foreground">{activity.text}</p>
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {activity.time}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 function AlertsCard() {
-  const alerts = [
-    { icon: AlertTriangle, color: 'text-warning bg-warning-muted', title: 'Stock Bajo', desc: '3 materiales por debajo del mínimo', severity: 'alta' },
-    { icon: Clock, color: 'text-brand bg-brand-muted', title: 'Pendientes', desc: '5 cotizaciones esperando aprobación', severity: 'media' },
-    { icon: AlertTriangle, color: 'text-danger bg-danger-muted', title: 'Vencidas', desc: '2 órdenes de trabajo vencidas', severity: 'critica' },
-    { icon: CheckCircle2, color: 'text-success bg-success-muted', title: 'Completadas', desc: '8 tareas finalizadas hoy', severity: 'baja' },
-  ];
+  // Try to load alerts from localStorage
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('alerts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAlerts(parsed);
+          return;
+        }
+      }
+    } catch {
+      // fall through to empty
+    }
+    // Show empty state when no real data exists
+    setAlerts([]);
+  }, []);
+
+  const activeCount = alerts.filter(
+    (a) => a.severity === 'critica' || a.severity === 'alta'
+  ).length;
 
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Alertas y Notificaciones</CardTitle>
-        <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">
-          {alerts.filter(a => a.severity === 'critica' || a.severity === 'alta').length} activas
-        </span>
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-brand" />
+          <CardTitle>Alertas y Notificaciones</CardTitle>
+        </div>
+        {activeCount > 0 && (
+          <span className="rounded-full bg-danger-muted px-2 py-0.5 text-xs font-medium text-danger">
+            {activeCount} activas
+          </span>
+        )}
       </CardHeader>
-      <CardContent className="space-y-4">
-        {alerts.map((alert, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <div className={`mt-0.5 rounded-lg p-1.5 ${alert.color}`}>
-              <alert.icon className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-foreground">{alert.title}</p>
-                {alert.severity === 'critica' && (
-                  <span className="rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-danger">
-                    Crítica
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">{alert.desc}</p>
-            </div>
-            <button className="mt-0.5 text-muted-foreground hover:text-brand transition-colors">
-              <ArrowRight className="h-4 w-4" />
-            </button>
+      <CardContent>
+        {alerts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <CheckCircle2 className="mb-2 h-8 w-8 text-success/50" />
+            <p className="text-sm text-muted-foreground">
+              Sin alertas activas
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Todo está en orden
+            </p>
           </div>
-        ))}
+        ) : (
+          <div className="space-y-4">
+            {alerts.map((alert) => (
+              <div key={alert.id} className="flex items-start gap-3">
+                <div className={`mt-0.5 rounded-lg p-1.5 ${alert.iconBg}`}>
+                  <alert.icon className={`h-3.5 w-3.5 ${alert.iconColor}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                      {alert.title}
+                    </p>
+                    {alert.severity === 'critica' && (
+                      <span className="rounded bg-danger-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-danger">
+                        Crítica
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {alert.desc}
+                  </p>
+                </div>
+                <button className="mt-0.5 text-muted-foreground transition-colors hover:text-brand">
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

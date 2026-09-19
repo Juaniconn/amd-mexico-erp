@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Inbox,
   ListChecks,
+  Percent,
 } from 'lucide-react';
 import { get, post, put, del } from '@/lib/api';
 
@@ -84,16 +85,18 @@ const RESULTADOS = [
   { value: 'rework', label: 'Rework' },
 ];
 
+const TIPOS = [
+  { value: 'inspeccion_inicial', label: 'Inspección Inicial' },
+  { value: 'inspeccion_final', label: 'Inspección Final' },
+  { value: 'inspeccion_proceso', label: 'Inspección en Proceso' },
+];
+
 function getResultadoBadgeVariant(resultado: string): 'success' | 'destructive' | 'warning' | 'secondary' {
   switch (resultado) {
-    case 'aprobado':
-      return 'success';
-    case 'rechazado':
-      return 'destructive';
-    case 'rework':
-      return 'warning';
-    default:
-      return 'secondary';
+    case 'aprobado': return 'success';
+    case 'rechazado': return 'destructive';
+    case 'rework': return 'warning';
+    default: return 'secondary';
   }
 }
 
@@ -127,6 +130,7 @@ function CalidadContent() {
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [resultadoFilter, setResultadoFilter] = useState('');
+  const [tipoFilter, setTipoFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
 
@@ -269,13 +273,7 @@ function CalidadContent() {
   function getOperacionLabel(item: CalidadItem) {
     if (item.operacion) {
       const nombre = item.operacion.proceso || item.operacion.nombre || 'Sin nombre';
-      const pieza = item.operacion.wo?.piezaNombre || '';
-      return (
-        <div>
-          <div className="font-medium">{nombre}</div>
-          {pieza && <div className="text-xs text-muted-foreground">{pieza}</div>}
-        </div>
-      );
+      return <span className="font-medium">{nombre}</span>;
     }
     return <span className="text-muted-foreground">Sin operación</span>;
   }
@@ -291,7 +289,7 @@ function CalidadContent() {
   const totalControles = meta?.total ?? items.length;
   const aprobados = items.filter((i) => i.resultado === 'aprobado').length;
   const rechazados = items.filter((i) => i.resultado === 'rechazado').length;
-  const pendientes = items.filter((i) => i.resultado !== 'aprobado' && i.resultado !== 'rechazado').length;
+  const tasaAprobacion = totalControles > 0 ? Math.round((aprobados / totalControles) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -320,48 +318,48 @@ function CalidadContent() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Controles"
+          title="Total Inspecciones"
           value={totalControles}
           icon={<ListChecks className="h-4 w-4" />}
         />
         <StatCard
-          title="Pendientes"
-          value={pendientes}
-          icon={<Clock className="h-4 w-4" />}
-          variant="warning"
-        />
-        <StatCard
-          title="Aprobados"
+          title="Aprobadas"
           value={aprobados}
           icon={<CheckCircle2 className="h-4 w-4" />}
           variant="success"
         />
         <StatCard
-          title="Rechazados"
+          title="Rechazadas"
           value={rechazados}
           icon={<XCircle className="h-4 w-4" />}
           variant="destructive"
         />
+        <StatCard
+          title="Tasa Aprobación"
+          value={`${tasaAprobacion}%`}
+          icon={<Percent className="h-4 w-4" />}
+          variant="brand"
+        />
       </div>
 
-      {/* Search/Filter Bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por defectos o pieza..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-          />
-        </div>
-        <div className="relative">
+      {/* Search & Filter Bar */}
+      <div className="card-premium p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar por observaciones o producto..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="input-base pl-9"
+            />
+          </div>
           <select
             value={resultadoFilter}
             onChange={(e) => handleResultadoChange(e.target.value)}
-            className="h-full appearance-none rounded-lg border border-input bg-background py-2 pl-3 pr-8 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+            className="input-base sm:w-48"
           >
             <option value="">Todos los resultados</option>
             {RESULTADOS.map((r) => (
@@ -370,16 +368,28 @@ function CalidadContent() {
               </option>
             ))}
           </select>
+          <select
+            value={tipoFilter}
+            onChange={(e) => setTipoFilter(e.target.value)}
+            className="input-base sm:w-48"
+          >
+            <option value="">Todos los tipos</option>
+            {TIPOS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSearch}
+            className="gap-2"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Buscar
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSearch}
-          className="gap-2"
-        >
-          <Search className="h-3.5 w-3.5" />
-          Buscar
-        </Button>
       </div>
 
       {/* Error State */}
@@ -395,12 +405,12 @@ function CalidadContent() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Operación</TableHead>
-              <TableHead>Pieza</TableHead>
-              <TableHead>Resultado</TableHead>
-              <TableHead>Defectos</TableHead>
+              <TableHead>Folio</TableHead>
+              <TableHead>Producto</TableHead>
               <TableHead>Inspector</TableHead>
               <TableHead>Fecha</TableHead>
+              <TableHead>Resultado</TableHead>
+              <TableHead>Observaciones</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -416,20 +426,20 @@ function CalidadContent() {
             ) : (
               items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>{getOperacionLabel(item)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.operacion?.wo?.piezaNombre || '—'}
+                  <TableCell className="font-medium">
+                    <span className="text-primary">{item.id.slice(0, 8)}</span>
                   </TableCell>
+                  <TableCell>{getOperacionLabel(item)}</TableCell>
+                  <TableCell className="text-muted-foreground">{getInspectorName(item)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(item.createdAt)}</TableCell>
                   <TableCell>
                     <Badge variant={getResultadoBadgeVariant(item.resultado)}>
                       {getResultadoLabel(item.resultado)}
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-xs truncate text-muted-foreground">
-                    {item.defectos || '—'}
+                    {item.observaciones || item.defectos || '—'}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{getInspectorName(item)}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(item.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button
@@ -517,7 +527,7 @@ function CalidadContent() {
                         required
                         value={form.operacionId}
                         onChange={(e) => setForm({ ...form, operacionId: e.target.value })}
-                        className="w-full appearance-none rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                        className="input-base appearance-none pl-10"
                       >
                         <option value="">Seleccionar operación...</option>
                         {operaciones.map((op) => (
@@ -540,7 +550,7 @@ function CalidadContent() {
                       required
                       value={form.resultado}
                       onChange={(e) => setForm({ ...form, resultado: e.target.value })}
-                      className="w-full appearance-none rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                      className="input-base appearance-none pl-10"
                     >
                       {RESULTADOS.map((r) => (
                         <option key={r.value} value={r.value}>
@@ -563,7 +573,7 @@ function CalidadContent() {
                       onChange={(e) => setForm({ ...form, defectos: e.target.value })}
                       maxLength={500}
                       placeholder="Describa los defectos encontrados..."
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                      className="input-base pl-10"
                     />
                   </div>
                 </div>
@@ -578,9 +588,16 @@ function CalidadContent() {
                     rows={3}
                     maxLength={1000}
                     placeholder="Observaciones adicionales..."
-                    className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none resize-none"
+                    className="input-base resize-none"
                   />
                 </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    {error}
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-3 border-t pt-4">
                   <Button
@@ -611,34 +628,33 @@ function StatCard({
   variant = 'default',
 }: {
   title: string;
-  value: number;
+  value: number | string;
   icon: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning';
+  variant?: 'default' | 'success' | 'destructive' | 'warning' | 'brand';
 }) {
+  const variantClass =
+    variant === 'success'
+      ? 'bg-success-muted text-success'
+      : variant === 'destructive'
+      ? 'bg-danger-muted text-danger'
+      : variant === 'warning'
+      ? 'bg-warning-muted text-warning'
+      : variant === 'brand'
+      ? 'bg-brand-muted text-brand'
+      : 'bg-primary/10 text-primary';
+
   return (
-    <Card className="card-premium transition-all duration-200 hover:shadow-lg">
-      <CardContent className="flex items-center gap-4 p-4">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            variant === 'success'
-              ? 'bg-success-muted text-success'
-              : variant === 'destructive'
-              ? 'bg-destructive/10 text-destructive'
-              : variant === 'warning'
-              ? 'bg-warning-muted text-warning'
-              : 'bg-primary/10 text-primary'
-          }`}
-        >
+    <div className="card-premium p-5 transition-all duration-200 hover:shadow-lg">
+      <div className="flex items-center gap-4">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${variantClass}`}>
           {icon}
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            {title}
-          </p>
+          <p className="section-title">{title}</p>
           <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -651,12 +667,6 @@ function TableSkeletonRows() {
             <div className="h-4 w-28 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-5 w-16 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
             <div className="h-4 w-24 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
@@ -664,6 +674,12 @@ function TableSkeletonRows() {
           </TableCell>
           <TableCell>
             <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+          </TableCell>
+          <TableCell>
+            <div className="h-5 w-16 animate-pulse rounded bg-muted" />
+          </TableCell>
+          <TableCell>
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
             <div className="flex justify-end gap-1">

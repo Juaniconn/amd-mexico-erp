@@ -1,43 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  TableContainer,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
 import {
   Search,
   Plus,
-  Pencil,
-  Trash2,
-  X,
   Factory,
   Truck,
-  TruckIcon,
+  Package,
+  Filter,
+  AlertCircle,
   Inbox,
-  Hash,
-  Receipt,
+  Edit3,
+  Trash2,
+  X,
   Users,
   Phone,
   Mail,
   MapPin,
-  Globe,
-  Calendar,
-  CreditCard,
-  AlertCircle,
-  Package,
+  Loader2,
+  ShoppingCart,
 } from 'lucide-react';
-import { get, post, put, del } from '@/lib/api';
+import { get, post, patch, del, ApiError } from '@/lib/api';
 import type { Proveedor } from '@/types';
+
+// ─── Types ──────────────────────────────────────────────────
 
 interface ProveedorListResponse {
   data: Proveedor[];
@@ -63,6 +50,7 @@ interface ProveedorForm {
   pais: string;
   diasCredito: number;
   monedaPref: string;
+  activo: boolean;
 }
 
 const emptyForm: ProveedorForm = {
@@ -79,9 +67,10 @@ const emptyForm: ProveedorForm = {
   pais: 'México',
   diasCredito: 30,
   monedaPref: 'MXN',
+  activo: true,
 };
 
-const VERSION = '0.1.0';
+// ─── Page ───────────────────────────────────────────────────
 
 export default function ProveedoresPage() {
   return (
@@ -98,14 +87,16 @@ function ProveedoresContent() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
 
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Proveedor | null>(null);
-
   const [form, setForm] = useState<ProveedorForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  async function loadProveedores(p = 1, s = '') {
+  const loadProveedores = useCallback(async (p = 1, s = '', status = '') => {
     try {
       setLoading(true);
       setError('');
@@ -114,28 +105,44 @@ function ProveedoresContent() {
       q.set('limit', '10');
       if (s) q.set('search', s);
       const res = await get<ProveedorListResponse>(`/api/proveedores?${q}`);
-      setProveedores(res.data);
+      const filtered = status === 'activo'
+        ? res.data.filter((p) => p.activo !== false)
+        : status === 'inactivo'
+        ? res.data.filter((p) => p.activo === false)
+        : res.data;
+      setProveedores(filtered);
       setMeta(res.meta);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar proveedores');
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadProveedores(page, search);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+    loadProveedores(page, search, statusFilter);
+  }, [page, loadProveedores]);
 
   function flashSuccess(msg: string) {
     setSuccess(msg);
     setTimeout(() => setSuccess(''), 3000);
   }
 
+  function handleSearch() {
+    setPage(1);
+    loadProveedores(1, search, statusFilter);
+  }
+
+  function handleStatusChange(status: string) {
+    setStatusFilter(status);
+    setPage(1);
+    loadProveedores(1, search, status);
+  }
+
   function openNew() {
     setEditing(null);
     setForm(emptyForm);
+    setError('');
     setShowModal(true);
   }
 
@@ -155,27 +162,42 @@ function ProveedoresContent() {
       pais: p.pais || 'México',
       diasCredito: p.diasCredito || 30,
       monedaPref: p.monedaPref || 'MXN',
+      activo: p.activo !== false,
     });
+    setError('');
     setShowModal(true);
+  }
+
+  function updateForm(field: keyof ProveedorForm, value: any) {
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    setSuccess('');
+    setSaving(true);
     try {
       const payload = { ...form };
       if (editing) {
-        await put(`/api/proveedores/${editing.id}`, payload);
+        await patch(`/api/proveedores/${editing.id}`, payload);
         flashSuccess('Proveedor actualizado correctamente');
       } else {
         await post('/api/proveedores', payload);
         flashSuccess('Proveedor creado correctamente');
       }
       setShowModal(false);
-      loadProveedores(page, search);
+      loadProveedores(page, search, statusFilter);
     } catch (err: any) {
-      setError(err?.message || 'Error al guardar el proveedor');
+      if (err instanceof ApiError && err.status === 422) {
+        setError(
+          'Error de validación: ' +
+            (err.data?.details?.map((d: any) => d.message).join(', ') || err.message)
+        );
+      } else {
+        setError(err?.message || 'Error al guardar el proveedor');
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -183,10 +205,9 @@ function ProveedoresContent() {
     if (!confirm('¿Está seguro de eliminar este proveedor? Esta acción no se puede deshacer.')) return;
     try {
       setError('');
-      setSuccess('');
       await del(`/api/proveedores/${id}`);
       flashSuccess('Proveedor eliminado correctamente');
-      loadProveedores(page, search);
+      loadProveedores(page, search, statusFilter);
     } catch (err: any) {
       setError(err?.message || 'Error al eliminar el proveedor');
     }
@@ -195,96 +216,94 @@ function ProveedoresContent() {
   // Stats calculations
   const totalProveedores = meta?.total ?? proveedores.length;
   const activos = proveedores.filter((p) => p.activo !== false).length;
-  const inactivos = proveedores.filter((p) => p.activo === false).length;
   const conOrdenes = proveedores.filter((p) => (p._count?.ordenesCompraProveedor ?? 0) > 0).length;
+  const productosSum = proveedores.reduce(
+    (sum, p) => sum + (p._count?.ordenesCompraProveedor ?? 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Proveedores</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Proveedores</h1>
           <p className="text-sm text-muted-foreground">
             Gestión de proveedores del ERP AMD México
           </p>
         </div>
-        <Button onClick={openNew} size="sm" className="gap-2">
+        <button onClick={openNew} className="btn-primary gap-2 px-4 py-2 text-sm">
           <Plus className="h-4 w-4" />
           Nuevo Proveedor
-        </Button>
+        </button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total"
+          icon={<Factory className="h-5 w-5" />}
+          label="Total"
           value={totalProveedores}
-          icon={<Factory className="h-4 w-4" />}
+          color="brand"
         />
         <StatCard
-          title="Activos"
+          icon={<Truck className="h-5 w-5" />}
+          label="Activos"
           value={activos}
-          icon={<Truck className="h-4 w-4" />}
-          variant="success"
+          color="success"
         />
         <StatCard
-          title="Inactivos"
-          value={inactivos}
-          icon={<TruckIcon className="h-4 w-4" />}
-          variant="destructive"
-        />
-        <StatCard
-          title="Con órdenes"
+          icon={<ShoppingCart className="h-5 w-5" />}
+          label="Con órdenes"
           value={conOrdenes}
-          icon={<Package className="h-4 w-4" />}
-          variant="warning"
+          color="warning"
+        />
+        <StatCard
+          icon={<Package className="h-5 w-5" />}
+          label="Productos"
+          value={productosSum}
+          color="brand"
         />
       </div>
 
-      {/* Search/Filter Bar */}
-      <div className="flex items-center gap-3">
+      {/* Search & Filter Bar */}
+      <div className="card-premium flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Buscar por código, razón social o ciudad..."
+            placeholder="Buscar por nombre, código o ciudad..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setPage(1);
-                loadProveedores(1, search);
-              }
-            }}
-            className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="input-base pl-9"
           />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setPage(1);
-            loadProveedores(1, search);
-          }}
-          className="gap-2"
+        <select
+          value={statusFilter}
+          onChange={(e) => handleStatusChange(e.target.value)}
+          className="input-base sm:w-40"
         >
-          <Search className="h-3.5 w-3.5" />
-          Buscar
-        </Button>
+          <option value="">Todos</option>
+          <option value="activo">Activos</option>
+          <option value="inactivo">Inactivos</option>
+        </select>
+        <button onClick={handleSearch} className="btn-outline gap-2 px-4 py-2 text-sm">
+          <Filter className="h-3.5 w-3.5" />
+          Filtrar
+        </button>
       </div>
 
       {/* Success Message */}
       {success && (
         <div className="flex items-center gap-3 rounded-xl border border-success/20 bg-success-muted px-4 py-3 text-sm text-success">
-          <Badge variant="success" className="shrink-0">
-            ✓
-          </Badge>
+          <span className="font-medium">✓</span>
           <span>{success}</span>
         </div>
       )}
 
       {/* Error State */}
-      {error && (
+      {error && !showModal && (
         <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
@@ -292,440 +311,476 @@ function ProveedoresContent() {
       )}
 
       {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Razón Social</TableHead>
-              <TableHead>RFC</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead>Ciudad</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Moneda</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableSkeletonRows />
-            ) : proveedores.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8}>
-                  <EmptyState />
-                </TableCell>
-              </TableRow>
-            ) : (
-              proveedores.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.codigo}</TableCell>
-                  <TableCell>{p.razonSocial}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {p.rfc || '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {p.email || p.contacto || '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {p.ciudad || '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={p.activo !== false ? 'success' : 'destructive'}>
-                      {p.activo !== false ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{p.monedaPref || 'MXN'}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(p)}
-                        title="Editar proveedor"
+      <div className="card-premium overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-muted/30">
+                <th className="border-b border-border px-4 py-3 text-left text-section-title">
+                  Nombre
+                </th>
+                <th className="border-b border-border px-4 py-3 text-left text-section-title">
+                  Contacto
+                </th>
+                <th className="border-b border-border px-4 py-3 text-left text-section-title">
+                  Email
+                </th>
+                <th className="border-b border-border px-4 py-3 text-left text-section-title">
+                  Teléfono
+                </th>
+                <th className="border-b border-border px-4 py-3 text-right text-section-title">
+                  Productos
+                </th>
+                <th className="border-b border-border px-4 py-3 text-right text-section-title">
+                  Órdenes
+                </th>
+                <th className="border-b border-border px-4 py-3 text-left text-section-title">
+                  Estatus
+                </th>
+                <th className="border-b border-border px-4 py-3 text-right text-section-title">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="text-table">
+              {loading ? (
+                <LoadingRows />
+              ) : proveedores.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12">
+                    <EmptyState
+                      message="No hay proveedores registrados"
+                      description="Agregue un nuevo proveedor para comenzar"
+                    />
+                  </td>
+                </tr>
+              ) : (
+                proveedores.map((p, idx) => (
+                  <tr
+                    key={p.id}
+                    className={`transition-colors hover:bg-muted/20 ${
+                      idx !== proveedores.length - 1 ? 'border-b border-border' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-foreground">{p.razonSocial}</div>
+                      <div className="text-xs text-muted-foreground">{p.codigo}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        {p.contacto || '—'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" />
+                        {p.email || '—'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        {p.telefono || '—'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-foreground">
+                      {p._count?.ordenesCompraProveedor ?? 0}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-foreground">
+                      {p._count?.ordenesCompraProveedor ?? 0}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${
+                          p.activo !== false
+                            ? 'bg-success-muted text-success border-success/20'
+                            : 'bg-destructive/10 text-destructive border-destructive/20'
+                        }`}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDelete(p.id)}
-                        title="Eliminar proveedor"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                        {p.activo !== false ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(p)}
+                          title="Editar proveedor"
+                          className="btn-ghost h-8 w-8 p-0"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          title="Eliminar proveedor"
+                          className="btn-ghost h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination Footer */}
         {meta && !loading && proveedores.length > 0 && (
-          <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
+          <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             <span>
               Mostrando {proveedores.length} de {meta.total} proveedores
             </span>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
+                className="btn-outline px-3 py-1.5 text-xs disabled:opacity-50"
               >
                 Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
+              </button>
+              <button
                 onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
                 disabled={page >= meta.totalPages}
+                className="btn-outline px-3 py-1.5 text-xs disabled:opacity-50"
               >
                 Siguiente
-              </Button>
+              </button>
             </div>
           </div>
         )}
-      </TableContainer>
+      </div>
 
-      {/* Footer */}
-      <footer className="border-t pt-4 text-center">
-        <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} AMD México Operations ERP · v{VERSION}
-        </p>
-      </footer>
-
-      {/* Modal */}
+      {/* Modal Form */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <CardHeader className="flex-row items-center justify-between space-y-0 border-b pb-4">
-              <CardTitle>{editing ? 'Editar Proveedor' : 'Nuevo Proveedor'}</CardTitle>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+          <div className="card-premium w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">
+                {editing ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+              </h2>
+              <button
                 onClick={() => setShowModal(false)}
+                className="btn-ghost h-8 w-8 p-0"
               >
                 <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Row 1: Código + RFC */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Código *
-                    </label>
-                    <div className="relative">
-                      <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        required
-                        value={form.codigo}
-                        onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      RFC
-                    </label>
-                    <div className="relative">
-                      <Receipt className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={form.rfc}
-                        onChange={(e) => setForm({ ...form, rfc: e.target.value })}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
+              </button>
+            </div>
 
-                {/* Razón Social */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Razón Social *
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Row 1: Código + RFC */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Código *
                   </label>
-                  <div className="relative">
-                    <Factory className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      required
-                      value={form.razonSocial}
-                      onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={form.codigo}
+                    onChange={(e) => updateForm('codigo', e.target.value)}
+                    className="input-base"
+                    placeholder="PROV-2026-0001"
+                  />
                 </div>
-
-                {/* Row 3: Contacto + Teléfono */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Contacto
-                    </label>
-                    <div className="relative">
-                      <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={form.contacto}
-                        onChange={(e) => setForm({ ...form, contacto: e.target.value })}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Teléfono
-                    </label>
-                    <div className="relative">
-                      <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={form.telefono}
-                        onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Email
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    RFC
                   </label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={form.rfc}
+                    onChange={(e) => updateForm('rfc', e.target.value)}
+                    className="input-base"
+                    placeholder="XAXX010101000"
+                  />
                 </div>
+              </div>
 
-                {/* Dirección */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Dirección
+              {/* Razón Social */}
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Razón Social *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.razonSocial}
+                  onChange={(e) => updateForm('razonSocial', e.target.value)}
+                  className="input-base"
+                  placeholder="Nombre del proveedor"
+                />
+              </div>
+
+              {/* Row 3: Contacto + Teléfono */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Contacto
                   </label>
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      value={form.direccion}
-                      onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={form.contacto}
+                    onChange={(e) => updateForm('contacto', e.target.value)}
+                    className="input-base"
+                    placeholder="Nombre del contacto"
+                  />
                 </div>
-
-                {/* Row 6: Ciudad + Estado + Código Postal */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Ciudad
-                    </label>
-                    <input
-                      type="text"
-                      value={form.ciudad}
-                      onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Estado
-                    </label>
-                    <input
-                      type="text"
-                      value={form.estado}
-                      onChange={(e) => setForm({ ...form, estado: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Código Postal
-                    </label>
-                    <input
-                      type="text"
-                      value={form.codigoPostal}
-                      onChange={(e) => setForm({ ...form, codigoPostal: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    value={form.telefono}
+                    onChange={(e) => updateForm('telefono', e.target.value)}
+                    className="input-base"
+                    placeholder="+52 55 1234 5678"
+                  />
                 </div>
+              </div>
 
-                {/* Row 7: País + Moneda */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      País
-                    </label>
-                    <div className="relative">
-                      <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={form.pais}
-                        onChange={(e) => setForm({ ...form, pais: e.target.value })}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Moneda Preferida
-                    </label>
-                    <div className="relative">
-                      <CreditCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <select
-                        value={form.monedaPref}
-                        onChange={(e) => setForm({ ...form, monedaPref: e.target.value })}
-                        className="w-full appearance-none rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      >
-                        <option value="MXN">MXN - Peso Mexicano</option>
-                        <option value="USD">USD - Dólar Americano</option>
-                      </select>
-                    </div>
-                  </div>
+              {/* Email */}
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => updateForm('email', e.target.value)}
+                  className="input-base"
+                  placeholder="contacto@proveedor.com"
+                />
+              </div>
+
+              {/* Dirección */}
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Dirección
+                </label>
+                <input
+                  type="text"
+                  value={form.direccion}
+                  onChange={(e) => updateForm('direccion', e.target.value)}
+                  className="input-base"
+                  placeholder="Calle, número, colonia"
+                />
+              </div>
+
+              {/* Row 6: Ciudad + Estado + Código Postal */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Ciudad
+                  </label>
+                  <input
+                    type="text"
+                    value={form.ciudad}
+                    onChange={(e) => updateForm('ciudad', e.target.value)}
+                    className="input-base"
+                  />
                 </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Estado
+                  </label>
+                  <input
+                    type="text"
+                    value={form.estado}
+                    onChange={(e) => updateForm('estado', e.target.value)}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    C.P.
+                  </label>
+                  <input
+                    type="text"
+                    value={form.codigoPostal}
+                    onChange={(e) => updateForm('codigoPostal', e.target.value)}
+                    className="input-base"
+                  />
+                </div>
+              </div>
 
-                {/* Row 8: Días de Crédito */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              {/* Row 7: País + Moneda */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    País
+                  </label>
+                  <input
+                    type="text"
+                    value={form.pais}
+                    onChange={(e) => updateForm('pais', e.target.value)}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Moneda
+                  </label>
+                  <select
+                    value={form.monedaPref}
+                    onChange={(e) => updateForm('monedaPref', e.target.value)}
+                    className="input-base"
+                  >
+                    <option value="MXN">MXN - Peso Mexicano</option>
+                    <option value="USD">USD - Dólar Americano</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Días de Crédito */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     Días de Crédito
                   </label>
-                  <div className="relative">
-                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.diasCredito}
+                    onChange={(e) => updateForm('diasCredito', Number(e.target.value))}
+                    className="input-base"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="number"
-                      min={0}
-                      value={form.diasCredito}
-                      onChange={(e) => setForm({ ...form, diasCredito: Number(e.target.value) })}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+                      type="checkbox"
+                      checked={form.activo}
+                      onChange={(e) => updateForm('activo', e.target.checked)}
+                      className="h-4 w-4 rounded border-border"
                     />
-                  </div>
+                    <span className="text-sm font-medium text-foreground">Activo</span>
+                  </label>
                 </div>
+              </div>
 
-                {/* Actions */}
-                <div className="flex justify-end gap-3 border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" size="sm" className="gap-2">
-                    {editing ? 'Actualizar' : 'Crear'}
-                  </Button>
+              {/* Form Error */}
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="btn-outline px-4 py-2 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="btn-primary gap-2 px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {editing ? 'Actualizar' : 'Crear'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+// ─── Stat Card ──────────────────────────────────────────────
+
 function StatCard({
-  title,
-  value,
   icon,
-  variant = 'default',
+  label,
+  value,
+  color,
 }: {
-  title: string;
-  value: number;
   icon: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning';
+  label: string;
+  value: number;
+  color: 'brand' | 'warning' | 'success' | 'danger';
 }) {
+  const colorMap = {
+    brand: 'text-brand bg-brand-muted',
+    warning: 'text-warning bg-warning-muted',
+    success: 'text-success bg-success-muted',
+    danger: 'text-danger bg-danger-muted',
+  };
+
   return (
-    <Card className="card-premium transition-all duration-200 hover:shadow-lg">
-      <CardContent className="flex items-center gap-4 p-4">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            variant === 'success'
-              ? 'bg-success-muted text-success'
-              : variant === 'destructive'
-              ? 'bg-destructive/10 text-destructive'
-              : variant === 'warning'
-              ? 'bg-warning-muted text-warning'
-              : 'bg-primary/10 text-primary'
-          }`}
-        >
+    <div className="card-premium p-5">
+      <div className="flex items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="section-title">{label}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{value}</p>
+        </div>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colorMap[color]}`}>
           {icon}
         </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            {title}
-          </p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-function TableSkeletonRows() {
+// ─── Loading Rows ───────────────────────────────────────────
+
+function LoadingRows() {
   return (
     <>
       {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
+        <tr key={i} className="border-b border-border">
+          <td className="px-4 py-3">
             <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
+            <div className="mt-1 h-3 w-20 animate-pulse rounded bg-muted/70" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
             <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
+          </td>
+          <td className="px-4 py-3">
             <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-12 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-8 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-8 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-5 w-16 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
             <div className="flex justify-end gap-1">
               <div className="h-6 w-6 animate-pulse rounded bg-muted" />
               <div className="h-6 w-6 animate-pulse rounded bg-muted" />
             </div>
-          </TableCell>
-        </TableRow>
+          </td>
+        </tr>
       ))}
     </>
   );
 }
 
-function EmptyState() {
+// ─── Empty State ────────────────────────────────────────────
+
+function EmptyState({ message, description }: { message: string; description?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
+    <div className="flex flex-col items-center justify-center text-center">
       <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
-      <p className="text-sm font-medium text-muted-foreground">
-        No hay proveedores registrados
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground/70">
-        Agregue un nuevo proveedor para comenzar
-      </p>
+      <p className="text-sm font-medium text-muted-foreground">{message}</p>
+      {description && (
+        <p className="mt-1 text-xs text-muted-foreground/70">{description}</p>
+      )}
     </div>
   );
 }

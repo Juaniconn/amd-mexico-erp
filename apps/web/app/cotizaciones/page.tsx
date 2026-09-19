@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
+import { Card, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -21,69 +22,69 @@ import {
   Pencil,
   Trash2,
   Send,
-  X,
   FileText,
   Clock,
   CheckCircle2,
   XCircle,
   AlertCircle,
   Inbox,
-  User,
-  Calendar,
-  DollarSign,
   Hash,
-  Package,
-  Layers,
-  Timer,
-  Wrench,
-  StickyNote,
-  TrendingUp,
-  Percent,
+  DollarSign,
+  Eye,
 } from 'lucide-react';
-import { get, post, put, del, ApiError } from '@/lib/api';
+import { get, put, del, ApiError } from '@/lib/api';
+import type { Cotizacion } from '@/types';
 
-interface Cliente {
-  id: string;
-  codigo: string;
-  razonSocial: string;
-  rfc?: string;
-  ciudad?: string;
-  estado?: string;
-  email?: string;
-  telefono?: string;
-  creditoLimite?: number | string;
-  monedaPref: string;
-}
-
-interface DetalleCotizacion {
-  piezaNombre: string;
-  piezaDescripcion?: string;
-  cantidad: number;
-  unidad: string;
-  precioUnitario: number;
-  tiempoEstimado?: number;
-  procesoRequerido?: string;
-  notas?: string;
-}
-
-interface Cotizacion {
-  id: string;
-  folio: string;
-  clienteId: string;
+// Extended type to match API response which includes denormalizada fields
+interface CotizacionListItem extends Cotizacion {
   razonSocial?: string;
-  ciudad?: string;
-  moneda: 'MXN' | 'USD';
-  tipoCambio?: number | null;
-  subtotal: number;
-  iva: number;
-  total: number;
-  estatus: string;
-  validez: number;
-  detalles?: DetalleCotizacion[];
-  createdAt: string;
 }
 
-const VERSION = '0.1.0';
+const STATUS_OPTIONS = [
+  { value: '', label: 'Todos' },
+  { value: 'BORRADOR', label: 'Borrador' },
+  { value: 'ENVIADA', label: 'Enviada' },
+  { value: 'EN_REVISION', label: 'En Revisión' },
+  { value: 'ACEPTADA', label: 'Aprobada' },
+  { value: 'RECHAZADA', label: 'Rechazada' },
+  { value: 'CANCELADA', label: 'Cancelada' },
+  { value: 'CONVERTIDA', label: 'Convertida' },
+];
+
+const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
+  BORRADOR: 'secondary',
+  ENVIADA: 'default',
+  EN_REVISION: 'warning',
+  ACEPTADA: 'success',
+  RECHAZADA: 'destructive',
+  CANCELADA: 'outline',
+  CONVERTIDA: 'success',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  BORRADOR: 'Borrador',
+  ENVIADA: 'Enviada',
+  EN_REVISION: 'En Revisión',
+  ACEPTADA: 'Aprobada',
+  RECHAZADA: 'Rechazada',
+  CANCELADA: 'Cancelada',
+  CONVERTIDA: 'Convertida',
+};
+
+function formatCurrency(value: number | string, moneda: string = 'MXN'): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  const symbol = moneda === 'USD' ? 'US$' : '$';
+  return `${symbol} ${num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 export default function CotizacionesPage() {
   return (
@@ -95,36 +96,25 @@ export default function CotizacionesPage() {
 
 function CotizacionesContent() {
   const router = useRouter();
-  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [meta, setMeta] = useState<any>(null);
+  const [cotizaciones, setCotizaciones] = useState<CotizacionListItem[]>([]);
+  const [meta, setMeta] = useState<{ total: number; page: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const limit = 10;
 
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Cotizacion | null>(null);
-
-  // Form state for cotización
-  const [clienteId, setClienteId] = useState('');
-  const [validez, setValidez] = useState(30);
-  const [tipoCambio, setTipoCambio] = useState('');
-  const [notas, setNotas] = useState('');
-  const [detalles, setDetalles] = useState<DetalleCotizacion[]>([
-    { piezaNombre: '', cantidad: 1, unidad: 'pz', precioUnitario: 0 },
-  ]);
-  const [saving, setSaving] = useState(false);
-
-  async function loadCotizaciones(p = 1, s = '') {
+  const loadCotizaciones = useCallback(async (p = 1, s = '', status = '') => {
     try {
       setLoading(true);
       setError('');
       const q = new URLSearchParams();
       q.set('page', String(p));
-      q.set('limit', '10');
+      q.set('limit', String(limit));
       if (s) q.set('search', s);
-      const res = await get<{ data: Cotizacion[]; meta: any }>(`/api/cotizaciones?${q}`);
+      if (status) q.set('estatus', status);
+      const res = await get<{ data: CotizacionListItem[]; meta: any }>(`/api/cotizaciones?${q}`);
       setCotizaciones(res.data);
       setMeta(res.meta);
     } catch (err: any) {
@@ -132,91 +122,22 @@ function CotizacionesContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadCotizaciones(page, search);
-    get<{ data: Cliente[] }>('/api/clientes?limit=100')
-      .then((res) => setClientes(res.data))
-      .catch(() => {});
+    loadCotizaciones(page, search, statusFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  function openNew() {
-    setEditing(null);
-    setClienteId('');
-    setValidez(30);
-    setTipoCambio('');
-    setNotas('');
-    setDetalles([{ piezaNombre: '', cantidad: 1, unidad: 'pz', precioUnitario: 0 }]);
-    setError('');
-    setShowModal(true);
+  function handleSearch() {
+    setPage(1);
+    loadCotizaciones(1, search, statusFilter);
   }
 
-  function openEdit(c: Cotizacion) {
-    setEditing(c);
-    setClienteId(c.clienteId);
-    setValidez(c.validez);
-    setTipoCambio(c.tipoCambio ? String(c.tipoCambio) : '');
-    setNotas('');
-    setDetalles(c.detalles && c.detalles.length > 0
-      ? c.detalles.map((d) => ({ ...d }))
-      : [{ piezaNombre: '', cantidad: 1, unidad: 'pz', precioUnitario: 0 }]);
-    setError('');
-    setShowModal(true);
-  }
-
-  function updateDetalle(idx: number, field: keyof DetalleCotizacion, value: any) {
-    setDetalles((prev) => prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d)));
-  }
-
-  function addDetalle() {
-    setDetalles((prev) => [...prev, { piezaNombre: '', cantidad: 1, unidad: 'pz', precioUnitario: 0 }]);
-  }
-
-  function removeDetalle(idx: number) {
-    setDetalles((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function calcSubtotal() {
-    return detalles.reduce((sum, d) => sum + (Number(d.precioUnitario) || 0) * (Number(d.cantidad) || 0), 0);
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError('');
-    setSaving(true);
-    try {
-      const payload = {
-        clienteId,
-        validez: Number(validez),
-        tipoCambio: tipoCambio ? Number(tipoCambio) : null,
-        notas: notas || undefined,
-        detalles: detalles
-          .filter((d) => d.piezaNombre && d.cantidad > 0)
-          .map((d) => ({
-            ...d,
-            cantidad: Number(d.cantidad),
-            precioUnitario: Number(d.precioUnitario),
-            tiempoEstimado: d.tiempoEstimado ? Number(d.tiempoEstimado) : undefined,
-          })),
-      };
-      if (editing) {
-        await put(`/api/cotizaciones/${editing.id}`, payload);
-      } else {
-        await post('/api/cotizaciones', payload);
-      }
-      setShowModal(false);
-      loadCotizaciones(page, search);
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 422) {
-        setError('Error de validación: ' + err.data?.details?.map((d: any) => d.message).join(', '));
-      } else {
-        setError(err?.message || 'Error al guardar');
-      }
-    } finally {
-      setSaving(false);
-    }
+  function handleStatusChange(value: string) {
+    setStatusFilter(value);
+    setPage(1);
+    loadCotizaciones(1, search, value);
   }
 
   async function handleDelete(id: string) {
@@ -224,32 +145,30 @@ function CotizacionesContent() {
     try {
       setError('');
       await del(`/api/cotizaciones/${id}`);
-      loadCotizaciones(page, search);
+      loadCotizaciones(page, search, statusFilter);
     } catch (err: any) {
       setError(err?.message || 'Error al eliminar');
     }
   }
 
-  async function handleStatus(id: string, estatus: string) {
+  async function handleSend(id: string) {
     try {
       setError('');
-      await put(`/api/cotizaciones/${id}`, { estatus });
-      loadCotizaciones(page, search);
+      await put(`/api/cotizaciones/${id}`, { estatus: 'ENVIADA' });
+      loadCotizaciones(page, search, statusFilter);
     } catch (err: any) {
-      setError(err?.message || 'Error al cambiar estatus');
+      setError(err?.message || 'Error al enviar cotización');
     }
   }
 
-  const ivaRate = 0.16;
-
   // Stats calculations
-  const totalCotizaciones = cotizaciones.length;
-  const pendientes = cotizaciones.filter((c) => c.estatus === 'borrador').length;
-  const aprobadas = cotizaciones.filter((c) => c.estatus === 'enviada' || c.estatus === 'aceptada').length;
-  const rechazadas = cotizaciones.filter((c) => c.estatus === 'rechazada' || c.estatus === 'cancelada').length;
+  const totalCotizaciones = meta?.total ?? cotizaciones.length;
+  const pendientes = cotizaciones.filter((c) => c.estatus === 'BORRADOR' || c.estatus === 'EN_REVISION').length;
+  const aceptadas = cotizaciones.filter((c) => c.estatus === 'ACEPTADA' || c.estatus === 'CONVERTIDA').length;
+  const rechazadas = cotizaciones.filter((c) => c.estatus === 'RECHAZADA' || c.estatus === 'CANCELADA').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -258,61 +177,73 @@ function CotizacionesContent() {
             Gestión de RFQ y cotizaciones de manufactura
           </p>
         </div>
-        <Button
-          onClick={openNew}
-          size="sm"
-          className="gap-2"
-          disabled={clientes.length === 0}
-        >
-          <Plus className="h-4 w-4" />
-          Nueva Cotización
-        </Button>
+        <Link href="/cotizaciones/new">
+          <Button size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nueva Cotización
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total"
-          value={meta?.total ?? totalCotizaciones}
+          value={totalCotizaciones}
           icon={<FileText className="h-4 w-4" />}
+          description="Cotizaciones registradas"
         />
         <StatCard
           title="Pendientes"
           value={pendientes}
           icon={<Clock className="h-4 w-4" />}
           variant="warning"
+          description="Borrador / En revisión"
         />
         <StatCard
-          title="Aprobadas"
-          value={aprobadas}
+          title="Aceptadas"
+          value={aceptadas}
           icon={<CheckCircle2 className="h-4 w-4" />}
           variant="success"
+          description="Aprobadas / Convertidas"
         />
         <StatCard
           title="Rechazadas"
           value={rechazadas}
           icon={<XCircle className="h-4 w-4" />}
           variant="destructive"
+          description="Rechazadas / Canceladas"
         />
       </div>
 
-      {/* Search/Filter Bar */}
-      <div className="flex items-center gap-3">
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Buscar por folio, cliente o ciudad..."
+            placeholder="Buscar por cliente o folio..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && loadCotizaciones(1, search)}
-            className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="input-base pl-10"
           />
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => handleStatusChange(e.target.value)}
+          className="input-base sm:w-44"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => loadCotizaciones(1, search)}
+          onClick={handleSearch}
           className="gap-2"
         >
           <Search className="h-3.5 w-3.5" />
@@ -336,7 +267,6 @@ function CotizacionesContent() {
               <TableHead>Folio</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Fecha</TableHead>
-              <TableHead>Moneda</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead>Estatus</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -347,8 +277,12 @@ function CotizacionesContent() {
               <TableSkeletonRows />
             ) : cotizaciones.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7}>
-                  <EmptyState />
+                <TableCell colSpan={6}>
+                  <EmptyState
+                    icon={<Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />}
+                    title="No hay cotizaciones registradas"
+                    description="Cree una nueva cotización para comenzar"
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -357,40 +291,47 @@ function CotizacionesContent() {
                   <TableCell className="font-medium">
                     <button
                       onClick={() => router.push(`/cotizaciones/${c.id}`)}
-                      className="text-primary hover:underline font-medium"
+                      className="text-primary hover:underline font-medium flex items-center gap-1.5"
                     >
+                      <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                       {c.folio}
                     </button>
                   </TableCell>
-                  <TableCell>{c.razonSocial || c.clienteId}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(c.createdAt).toLocaleDateString('es-MX')}
+                  <TableCell className="text-table">{c.razonSocial || '—'}</TableCell>
+                  <TableCell className="text-table text-muted-foreground">
+                    {formatDate(c.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-table">
+                    {formatCurrency(c.total, c.moneda)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{c.moneda}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {c.moneda === 'USD' ? '$' : '$'}
-                    {Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge estatus={c.estatus} />
+                    <Badge variant={STATUS_VARIANTS[c.estatus] || 'secondary'}>
+                      {STATUS_LABELS[c.estatus] || c.estatus}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() => openEdit(c)}
+                        onClick={() => router.push(`/cotizaciones/${c.id}`)}
+                        title="Ver detalle"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => router.push(`/cotizaciones/${c.id}/edit`)}
                         title="Editar cotización"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      {c.estatus === 'borrador' && (
+                      {(c.estatus === 'BORRADOR' || c.estatus === 'EN_REVISION') && (
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => handleStatus(c.id, 'enviada')}
+                          onClick={() => handleSend(c.id)}
                           title="Enviar cotización"
                           className="text-success hover:text-success"
                         >
@@ -441,316 +382,7 @@ function CotizacionesContent() {
           </div>
         )}
       </TableContainer>
-
-      {/* Footer */}
-      <footer className="border-t pt-4 text-center">
-        <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} AMD México Operations ERP · v{VERSION}
-        </p>
-      </footer>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader className="flex-row items-center justify-between space-y-0 border-b pb-4">
-              <CardTitle>
-                {editing ? 'Editar Cotización' : 'Nueva Cotización'}
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setShowModal(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Row 1: Cliente + Validez */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Cliente *
-                    </label>
-                    <div className="relative">
-                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <select
-                        required
-                        value={clienteId}
-                        onChange={(e) => setClienteId(e.target.value)}
-                        className="w-full appearance-none rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      >
-                        <option value="">Seleccionar cliente...</option>
-                        {clientes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.codigo} — {c.razonSocial}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Validez (días)
-                    </label>
-                    <div className="relative">
-                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="number"
-                        min="1"
-                        max="365"
-                        value={validez}
-                        onChange={(e) => setValidez(Number(e.target.value))}
-                        className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tipo de cambio */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Tipo de cambio (opcional, para USD)
-                  </label>
-                  <div className="relative">
-                    <TrendingUp className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="number"
-                      step="0.0001"
-                      min="0"
-                      value={tipoCambio}
-                      onChange={(e) => setTipoCambio(e.target.value)}
-                      placeholder="Ej: 17.50"
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Detalle de piezas */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Detalle de piezas
-                    </label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addDetalle}
-                      className="gap-1.5"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Agregar línea
-                    </Button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {detalles.map((d, idx) => (
-                      <div key={idx} className="rounded-lg border border-border bg-muted/30 p-4">
-                        <div className="grid grid-cols-12 gap-3 items-end">
-                          <div className="col-span-12 sm:col-span-5">
-                            <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                              Pieza *
-                            </label>
-                            <div className="relative">
-                              <Package className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="text"
-                                required
-                                value={d.piezaNombre}
-                                onChange={(e) => updateDetalle(idx, 'piezaNombre', e.target.value)}
-                                placeholder="Nombre de la pieza"
-                                className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          <div className="col-span-4 sm:col-span-2">
-                            <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                              Cantidad
-                            </label>
-                            <div className="relative">
-                              <Layers className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="number"
-                                min="1"
-                                value={d.cantidad}
-                                onChange={(e) => updateDetalle(idx, 'cantidad', Number(e.target.value))}
-                                className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          <div className="col-span-4 sm:col-span-1">
-                            <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                              Unidad
-                            </label>
-                            <input
-                              type="text"
-                              value={d.unidad}
-                              onChange={(e) => updateDetalle(idx, 'unidad', e.target.value)}
-                              className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                            />
-                          </div>
-                          <div className="col-span-4 sm:col-span-3">
-                            <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                              Precio unitario
-                            </label>
-                            <div className="relative">
-                              <DollarSign className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={d.precioUnitario}
-                                onChange={(e) => updateDetalle(idx, 'precioUnitario', Number(e.target.value))}
-                                className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          <div className="col-span-12 sm:col-span-1">
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon-sm"
-                              onClick={() => removeDetalle(idx)}
-                              disabled={detalles.length <= 1}
-                              title="Eliminar línea"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div>
-                            <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                              Tiempo estimado (hrs)
-                            </label>
-                            <div className="relative">
-                              <Timer className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                value={d.tiempoEstimado || ''}
-                                onChange={(e) => updateDetalle(idx, 'tiempoEstimado', e.target.value ? Number(e.target.value) : undefined)}
-                                className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                              Proceso requerido
-                            </label>
-                            <div className="relative">
-                              <Wrench className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="text"
-                                value={d.procesoRequerido || ''}
-                                onChange={(e) => updateDetalle(idx, 'procesoRequerido', e.target.value)}
-                                placeholder="CNC, láser, torno..."
-                                className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Totals */}
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        <DollarSign className="h-3.5 w-3.5" />
-                        Subtotal
-                      </div>
-                      <p className="mt-1 text-lg font-bold">
-                        $ {calcSubtotal().toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        <Percent className="h-3.5 w-3.5" />
-                        IVA (16%)
-                      </div>
-                      <p className="mt-1 text-lg font-bold">
-                        $ {(calcSubtotal() * ivaRate).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        <Hash className="h-3.5 w-3.5" />
-                        Total
-                      </div>
-                      <p className="mt-1 text-lg font-bold">
-                        $ {(calcSubtotal() * (1 + ivaRate)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notas */}
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Notas
-                  </label>
-                  <div className="relative">
-                    <StickyNote className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <textarea
-                      value={notas}
-                      onChange={(e) => setNotas(e.target.value)}
-                      rows={2}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none resize-none"
-                      placeholder="Condiciones, observaciones..."
-                    />
-                  </div>
-                </div>
-
-                {/* Form Error */}
-                {error && (
-                  <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex justify-end gap-3 border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" size="sm" loading={saving} className="gap-2">
-                    {saving ? 'Guardando...' : editing ? 'Actualizar' : 'Crear'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
-  );
-}
-
-function StatusBadge({ estatus }: { estatus: string }) {
-  const variantMap: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
-    borrador: 'secondary',
-    enviada: 'default',
-    aceptada: 'success',
-    rechazada: 'destructive',
-    cancelada: 'outline',
-  };
-  return (
-    <Badge variant={variantMap[estatus] || 'secondary'}>
-      {estatus}
-    </Badge>
   );
 }
 
@@ -759,11 +391,13 @@ function StatCard({
   value,
   icon,
   variant = 'default',
+  description,
 }: {
   title: string;
   value: number;
   icon: React.ReactNode;
   variant?: 'default' | 'success' | 'destructive' | 'warning';
+  description?: string;
 }) {
   return (
     <Card className="card-premium transition-all duration-200 hover:shadow-lg">
@@ -781,11 +415,12 @@ function StatCard({
         >
           {icon}
         </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            {title}
-          </p>
+        <div className="min-w-0 flex-1">
+          <p className="section-title">{title}</p>
           <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
+          {description && (
+            <p className="mt-0.5 text-xs text-muted-foreground truncate">{description}</p>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -798,7 +433,10 @@ function TableSkeletonRows() {
       {Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
           <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            <div className="flex items-center gap-1.5">
+              <Hash className="h-3.5 w-3.5 animate-pulse bg-muted" />
+              <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            </div>
           </TableCell>
           <TableCell>
             <div className="h-4 w-32 animate-pulse rounded bg-muted" />
@@ -807,13 +445,10 @@ function TableSkeletonRows() {
             <div className="h-4 w-20 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
-            <div className="h-4 w-12 animate-pulse rounded bg-muted" />
+            <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />
           </TableCell>
           <TableCell>
             <div className="flex justify-end gap-1">
@@ -828,16 +463,20 @@ function TableSkeletonRows() {
   );
 }
 
-function EmptyState() {
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
-      <p className="text-sm font-medium text-muted-foreground">
-        No hay cotizaciones registradas
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground/70">
-        Agregue una nueva cotización para comenzar
-      </p>
+      {icon}
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground/70">{description}</p>
     </div>
   );
 }

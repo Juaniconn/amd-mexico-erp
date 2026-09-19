@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
@@ -17,17 +17,31 @@ import {
 import {
   Search,
   Plus,
-  X,
   Package,
-  AlertCircle,
   AlertTriangle,
   XCircle,
+  DollarSign,
+  AlertCircle,
   Inbox,
   Hash,
-  Boxes,
   Layers,
   Activity,
+  Tags,
 } from 'lucide-react';
+import { get, ApiError } from '@/lib/api';
+import type { Material } from '@/types';
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'Todas las categorías' },
+  { value: 'Material', label: 'Material' },
+  { value: 'Producto', label: 'Producto' },
+  { value: 'Servicio', label: 'Servicio' },
+];
+
+function formatCurrency(value: number | string = 0): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return `$ ${num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export default function InventarioPage() {
   return (
@@ -38,109 +52,73 @@ export default function InventarioPage() {
 }
 
 function InventarioContent() {
+  const [items, setItems] = useState<Material[]>([]);
+  const [meta, setMeta] = useState<{ total: number; page: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
-    codigo: '',
-    descripcion: '',
-    unidad: '',
-    stockActual: '',
-  });
-
-  async function load() {
+  const loadInventario = useCallback(async (p = 1, s = '', cat = '') => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || '/api'}/inventario/materiales?limit=100`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (!res.ok) {
-        throw new Error('Error al cargar inventario');
-      }
-
-      const data = await res.json();
-      setItems(data.data || []);
+      setError('');
+      const q = new URLSearchParams();
+      q.set('page', String(p));
+      q.set('limit', String(limit));
+      if (s) q.set('search', s);
+      if (cat) q.set('tipo', cat);
+      const res = await get<{ data: Material[]; meta: any }>(`/api/inventario/materiales?${q}`);
+      setItems(res.data);
+      setMeta(res.meta);
     } catch (err: any) {
-      setError(err?.message || 'Error de conexión');
+      setError(err?.message || 'Error al cargar inventario');
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load();
   }, []);
 
-  function openNew() {
-    setForm({ codigo: '', descripcion: '', unidad: '', stockActual: '' });
-    setShowModal(true);
+  useEffect(() => {
+    loadInventario(page, search, categoryFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  function handleSearch() {
+    setPage(1);
+    loadInventario(1, search, categoryFilter);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('accessToken');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/inventario/materiales`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...form,
-          stockActual: form.stockActual ? Number(form.stockActual) : 0,
-        }),
-      });
-      setShowModal(false);
-      load();
-    } catch (err: any) {
-      setError(err?.message || 'Error al guardar');
-    }
+  function handleCategoryChange(value: string) {
+    setCategoryFilter(value);
+    setPage(1);
+    loadInventario(1, search, value);
   }
 
   // Stats calculations
-  const totalProductos = items.length;
-  const stockBajo = items.filter((m) => (m.stockActual ?? 0) > 0 && (m.stockActual ?? 0) <= 10).length;
+  const totalProductos = meta?.total ?? items.length;
+  const stockBajo = items.filter((m) => (m.stockActual ?? 0) > 0 && (m.stockActual ?? 0) <= (m.stockMinimo || 10)).length;
   const sinStock = items.filter((m) => (m.stockActual ?? 0) === 0).length;
-  const valorInventario = items.reduce((acc, m) => acc + (m.stockActual ?? 0) * (m.precioUnitario ?? 0), 0);
+  const valorInventario = items.reduce((acc, m) => acc + Number(m.stockActual ?? 0) * Number(m.costoUnitario ?? 0), 0);
 
-  const filteredItems = items.filter((m) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      m.codigo?.toLowerCase().includes(q) ||
-      m.descripcion?.toLowerCase().includes(q) ||
-      m.unidad?.toLowerCase().includes(q)
-    );
-  });
-
-  function getStockStatus(stock: number) {
+  function getStockStatus(stock: number, stockMinimo: number = 10) {
     if (stock === 0) return { variant: 'destructive' as const, label: 'Sin stock', icon: XCircle };
-    if (stock <= 10) return { variant: 'warning' as const, label: 'Stock bajo', icon: AlertTriangle };
+    if (stock <= stockMinimo) return { variant: 'warning' as const, label: 'Stock bajo', icon: AlertTriangle };
     return { variant: 'success' as const, label: 'Disponible', icon: Activity };
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
           <p className="text-sm text-muted-foreground">
-            Materiales, stock y movimientos
+            Materiales, productos y servicios
           </p>
         </div>
-        <Button onClick={openNew} size="sm" className="gap-2">
+        <Button size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
           Nuevo Material
         </Button>
@@ -152,29 +130,33 @@ function InventarioContent() {
           title="Total Productos"
           value={totalProductos}
           icon={<Package className="h-4 w-4" />}
+          description="Registrados"
         />
         <StatCard
           title="Stock Bajo"
           value={stockBajo}
           icon={<AlertTriangle className="h-4 w-4" />}
           variant="warning"
+          description="≤ stock mínimo"
         />
         <StatCard
           title="Sin Stock"
           value={sinStock}
           icon={<XCircle className="h-4 w-4" />}
           variant="destructive"
+          description="Stock en cero"
         />
         <StatCard
           title="Valor Inventario"
-          value={`$${valorInventario.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
-          icon={<Layers className="h-4 w-4" />}
+          value={formatCurrency(valorInventario)}
+          icon={<DollarSign className="h-4 w-4" />}
           variant="success"
+          description="Costo × stock"
         />
       </div>
 
-      {/* Search Bar */}
-      <div className="flex items-center gap-3">
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -182,13 +164,28 @@ function InventarioContent() {
             placeholder="Buscar por código, descripción o unidad..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="input-base pl-10"
           />
+        </div>
+        <div className="relative sm:w-48">
+          <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <select
+            value={categoryFilter}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            className="input-base pl-10 appearance-none"
+          >
+            {CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => load()}
+          onClick={handleSearch}
           className="gap-2"
         >
           <Search className="h-3.5 w-3.5" />
@@ -212,28 +209,43 @@ function InventarioContent() {
               <TableHead>Código</TableHead>
               <TableHead>Descripción</TableHead>
               <TableHead>Unidad</TableHead>
-              <TableHead>Stock</TableHead>
+              <TableHead className="text-right">Stock</TableHead>
+              <TableHead className="text-right">Precio Unitario</TableHead>
               <TableHead>Estatus</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableSkeletonRows />
-            ) : filteredItems.length === 0 ? (
+            ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5}>
-                  <EmptyState />
+                <TableCell colSpan={6}>
+                  <EmptyState
+                    icon={<Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />}
+                    title="No hay materiales registrados"
+                    description="Agregue un nuevo material para comenzar"
+                  />
                 </TableCell>
               </TableRow>
             ) : (
-              filteredItems.map((m) => {
-                const status = getStockStatus(m.stockActual ?? 0);
+              items.map((m) => {
+                const status = getStockStatus(Number(m.stockActual ?? 0), Number(m.stockMinimo ?? 10));
                 return (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">{m.codigo}</TableCell>
-                    <TableCell>{m.descripcion}</TableCell>
-                    <TableCell className="text-muted-foreground">{m.unidad}</TableCell>
-                    <TableCell className="font-semibold">{m.stockActual ?? 0}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                        {m.codigo}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-table">{m.descripcion}</TableCell>
+                    <TableCell className="text-table text-muted-foreground">{m.unidad}</TableCell>
+                    <TableCell className="text-right font-semibold text-table">
+                      {Number(m.stockActual ?? 0).toLocaleString('es-MX')}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-table">
+                      {formatCurrency(m.costoUnitario ?? 0)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={status.variant}>
                         <status.icon className="mr-1 h-3 w-3" />
@@ -246,98 +258,34 @@ function InventarioContent() {
             )}
           </TableBody>
         </Table>
-      </TableContainer>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <CardContent className="space-y-5 p-5">
-              <div className="flex items-center justify-between border-b pb-4">
-                <h2 className="text-lg font-semibold">Nuevo Material</h2>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setShowModal(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Código *
-                  </label>
-                  <div className="relative">
-                    <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      required
-                      value={form.codigo}
-                      onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Descripción *
-                  </label>
-                  <div className="relative">
-                    <Boxes className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      required
-                      value={form.descripcion}
-                      onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Unidad
-                    </label>
-                    <input
-                      type="text"
-                      value={form.unidad}
-                      onChange={(e) => setForm({ ...form, unidad: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Stock Actual
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={form.stockActual}
-                      onChange={(e) => setForm({ ...form, stockActual: e.target.value })}
-                      className="w-full rounded-lg border border-input bg-background py-2 px-3 text-sm transition focus:ring-2 focus:ring-ring/30 focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Crear
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        {/* Pagination Footer */}
+        {meta && !loading && items.length > 0 && (
+          <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
+            <span>
+              Mostrando {items.length} de {meta.total} productos
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                disabled={page >= meta.totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
+      </TableContainer>
     </div>
   );
 }
@@ -347,11 +295,13 @@ function StatCard({
   value,
   icon,
   variant = 'default',
+  description,
 }: {
   title: string;
   value: number | string;
   icon: React.ReactNode;
   variant?: 'default' | 'success' | 'destructive' | 'warning';
+  description?: string;
 }) {
   return (
     <Card className="card-premium transition-all duration-200 hover:shadow-lg">
@@ -369,11 +319,12 @@ function StatCard({
         >
           {icon}
         </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            {title}
-          </p>
+        <div className="min-w-0 flex-1">
+          <p className="section-title">{title}</p>
           <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
+          {description && (
+            <p className="mt-0.5 text-xs text-muted-foreground truncate">{description}</p>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -386,7 +337,10 @@ function TableSkeletonRows() {
       {Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
           <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            <div className="flex items-center gap-1.5">
+              <Hash className="h-3.5 w-3.5 animate-pulse bg-muted" />
+              <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            </div>
           </TableCell>
           <TableCell>
             <div className="h-4 w-40 animate-pulse rounded bg-muted" />
@@ -395,7 +349,10 @@ function TableSkeletonRows() {
             <div className="h-4 w-12 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
-            <div className="h-4 w-10 animate-pulse rounded bg-muted" />
+            <div className="ml-auto h-4 w-10 animate-pulse rounded bg-muted" />
+          </TableCell>
+          <TableCell>
+            <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
           </TableCell>
           <TableCell>
             <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />
@@ -406,16 +363,20 @@ function TableSkeletonRows() {
   );
 }
 
-function EmptyState() {
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
-      <p className="text-sm font-medium text-muted-foreground">
-        No hay materiales registrados
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground/70">
-        Agregue un nuevo material para comenzar
-      </p>
+      {icon}
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground/70">{description}</p>
     </div>
   );
 }
