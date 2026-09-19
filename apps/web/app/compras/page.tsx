@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Search,
   Plus,
@@ -19,8 +22,9 @@ import {
   Inbox,
   Edit3,
   Trash2,
+  X,
 } from 'lucide-react';
-import { get, ApiError } from '@/lib/api';
+import { get, post, ApiError } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -63,6 +67,16 @@ interface OrdenCompraListResponse {
   };
 }
 
+interface OrdenCompraFormData {
+  clienteId: string;
+  cotizacionId?: string;
+  moneda: string;
+  fechaEntrega: string;
+  condicionesPago: string;
+  notas: string;
+  proveedores: { proveedorId: string; cantidad: number; precioUnitario: number; notas?: string }[];
+}
+
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos los estatus' },
   { value: 'pendiente', label: 'Pendiente' },
@@ -82,6 +96,7 @@ export default function ComprasPage() {
 }
 
 function ComprasContent() {
+  const router = useRouter();
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
   const [meta, setMeta] = useState<OrdenCompraListResponse['meta'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +104,18 @@ function ComprasContent() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState<OrdenCompraFormData>({
+    clienteId: '',
+    cotizacionId: '',
+    moneda: 'MXN',
+    fechaEntrega: '',
+    condicionesPago: '',
+    notas: '',
+    proveedores: [],
+  });
 
   const loadOrdenes = useCallback(async (p = 1, s = '', status = '') => {
     try {
@@ -124,6 +151,63 @@ function ComprasContent() {
     loadOrdenes(1, search, status);
   }
 
+  function openNewCompra() {
+    setForm({
+      clienteId: '',
+      cotizacionId: '',
+      moneda: 'MXN',
+      fechaEntrega: '',
+      condicionesPago: '',
+      notas: '',
+      proveedores: [],
+    });
+    setShowModal(true);
+  }
+
+  async function handleSubmitCompra(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await post('/api/ordenes-compra', {
+        clienteId: form.clienteId,
+        cotizacionId: form.cotizacionId || undefined,
+        moneda: form.moneda,
+        fechaEntrega: form.fechaEntrega || undefined,
+        condicionesPago: form.condicionesPago || undefined,
+        notas: form.notas || undefined,
+        proveedores: form.proveedores.length > 0
+          ? form.proveedores.map(p => ({
+              proveedorId: p.proveedorId,
+              cantidad: Number(p.cantidad),
+              precioUnitario: Number(p.precioUnitario),
+              notas: p.notas || undefined,
+            }))
+          : undefined,
+      });
+      setShowModal(false);
+      loadOrdenes(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al crear la orden de compra');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addProveedorRow() {
+    setForm({
+      ...form,
+      proveedores: [...form.proveedores, { proveedorId: '', cantidad: 1, precioUnitario: 0 }],
+    });
+  }
+
+  function removeProveedorRow(index: number) {
+    setForm({
+      ...form,
+      proveedores: form.proveedores.filter((_, i) => i !== index),
+    });
+  }
+
   // Stats calculations
   const totalOrdenes = meta?.total ?? ordenes.length;
   const pendientes = ordenes.filter((o) => o.estatus.toLowerCase() === 'pendiente').length;
@@ -144,35 +228,58 @@ function ComprasContent() {
             Gestión de órdenes de compra y proveedores
           </p>
         </div>
+        <Button size="sm" className="gap-2" onClick={openNewCompra}>
+          <Plus className="h-4 w-4" />
+          Nueva Compra
+        </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards with borders */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={<ShoppingCart className="h-5 w-5" />}
-          label="Total Órdenes"
-          value={totalOrdenes}
-          color="brand"
-        />
-        <StatCard
-          icon={<Clock className="h-5 w-5" />}
-          label="Pendientes"
-          value={pendientes}
-          color="warning"
-        />
-        <StatCard
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          label="Aprobadas"
-          value={aprobadas}
-          color="success"
-        />
-        <StatCard
-          icon={<DollarSign className="h-5 w-5" />}
-          label="Total Compras"
-          value={totalCompras}
-          color="brand"
-          isCurrency
-        />
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <ShoppingCart className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total Órdenes</p>
+              <p className="text-2xl font-bold tracking-tight">{totalOrdenes}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Pendientes</p>
+              <p className="text-2xl font-bold tracking-tight">{pendientes}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Aprobadas</p>
+              <p className="text-2xl font-bold tracking-tight">{aprobadas}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <DollarSign className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total Compras</p>
+              <p className="text-2xl font-bold tracking-tight">${totalCompras.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -266,10 +373,13 @@ function ComprasContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-foreground">
-                      <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/compras/${o.id}`)}
+                        className="flex items-center gap-2 text-primary hover:underline focus:outline-none"
+                      >
                         <FileText className="h-3.5 w-3.5 text-brand" />
                         {o.folio}
-                      </div>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-foreground">
                       {o.proveedores?.[0]?.proveedorNombre || o.razonSocial || o.clienteId}
@@ -321,6 +431,194 @@ function ComprasContent() {
           </div>
         )}
       </div>
+
+      {/* New Compra Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Nueva Orden de Compra</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitCompra} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.clienteId}
+                    onChange={(e) => setForm({ ...form, clienteId: e.target.value })}
+                    className="input-base"
+                    placeholder="ID del cliente"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Cotización (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={form.cotizacionId}
+                    onChange={(e) => setForm({ ...form, cotizacionId: e.target.value })}
+                    className="input-base"
+                    placeholder="ID de cotización"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Moneda
+                  </label>
+                  <select
+                    value={form.moneda}
+                    onChange={(e) => setForm({ ...form, moneda: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="MXN">MXN - Peso Mexicano</option>
+                    <option value="USD">USD - Dólar Americano</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Entrega
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaEntrega}
+                    onChange={(e) => setForm({ ...form, fechaEntrega: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Condiciones de Pago
+                  </label>
+                  <input
+                    type="text"
+                    value={form.condicionesPago}
+                    onChange={(e) => setForm({ ...form, condicionesPago: e.target.value })}
+                    className="input-base"
+                    placeholder="30 días"
+                  />
+                </div>
+              </div>
+
+              {/* Proveedores */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Proveedores
+                  </label>
+                  <Button type="button" variant="outline" size="sm" onClick={addProveedorRow} className="gap-1">
+                    <Plus className="h-3 w-3" />
+                    Agregar
+                  </Button>
+                </div>
+                {form.proveedores.length === 0 ? (
+                  <p className="py-3 text-center text-xs text-muted-foreground">
+                    Agregue al menos un proveedor
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {form.proveedores.map((p, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="ID Proveedor"
+                          value={p.proveedorId}
+                          onChange={(e) => {
+                            const updated = [...form.proveedores];
+                            updated[i] = { ...p, proveedorId: e.target.value };
+                            setForm({ ...form, proveedores: updated });
+                          }}
+                          className="input-base flex-1"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Cantidad"
+                          min={1}
+                          value={p.cantidad}
+                          onChange={(e) => {
+                            const updated = [...form.proveedores];
+                            updated[i] = { ...p, cantidad: Number(e.target.value) };
+                            setForm({ ...form, proveedores: updated });
+                          }}
+                          className="input-base w-24"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Precio"
+                          min={0}
+                          value={p.precioUnitario}
+                          onChange={(e) => {
+                            const updated = [...form.proveedores];
+                            updated[i] = { ...p, precioUnitario: Number(e.target.value) };
+                            setForm({ ...form, proveedores: updated });
+                          }}
+                          className="input-base w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => removeProveedorRow(i)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={form.notas}
+                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Observaciones de la orden"
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Crear Orden'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

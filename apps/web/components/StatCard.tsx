@@ -13,11 +13,11 @@ interface StatCardProps {
 }
 
 const variantStyles: Record<string, string> = {
-  default: 'bg-card ring-1 ring-border',
-  success: 'bg-success-muted/30 ring-1 ring-success/20',
-  warning: 'bg-warning-muted/30 ring-1 ring-warning/20',
-  danger: 'bg-danger-muted/30 ring-1 ring-danger/20',
-  brand: 'bg-brand-muted/20 ring-1 ring-brand/20',
+  default: 'bg-card border border-border',
+  success: 'bg-success-muted/30 border border-success/30',
+  warning: 'bg-warning-muted/30 border border-warning/30',
+  danger: 'bg-danger-muted/30 border border-danger/30',
+  brand: 'bg-brand-muted/20 border border-brand/30',
 };
 
 export function StatCard({ title, value, icon, trend, trendLabel, variant = 'default', className }: StatCardProps) {

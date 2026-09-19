@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
@@ -27,9 +28,23 @@ import {
   Layers,
   Activity,
   Tags,
+  X,
 } from 'lucide-react';
-import { get, ApiError } from '@/lib/api';
+import { get, post, ApiError } from '@/lib/api';
 import type { Material } from '@/types';
+
+interface MaterialFormData {
+  codigo: string;
+  descripcion: string;
+  tipo: string;
+  unidad: string;
+  stockActual: number;
+  stockMinimo: number;
+  costoUnitario: number;
+  moneda: string;
+  proveedorId?: string;
+  notas?: string;
+}
 
 const CATEGORY_OPTIONS = [
   { value: '', label: 'Todas las categorías' },
@@ -52,6 +67,7 @@ export default function InventarioPage() {
 }
 
 function InventarioContent() {
+  const router = useRouter();
   const [items, setItems] = useState<Material[]>([]);
   const [meta, setMeta] = useState<{ total: number; page: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +76,21 @@ function InventarioContent() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [page, setPage] = useState(1);
   const limit = 10;
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState<MaterialFormData>({
+    codigo: '',
+    descripcion: '',
+    tipo: 'Material',
+    unidad: 'pieza',
+    stockActual: 0,
+    stockMinimo: 10,
+    costoUnitario: 0,
+    moneda: 'MXN',
+    proveedorId: '',
+    notas: '',
+  });
 
   const loadInventario = useCallback(async (p = 1, s = '', cat = '') => {
     try {
@@ -96,6 +127,48 @@ function InventarioContent() {
     loadInventario(1, search, value);
   }
 
+  function openNewMaterial() {
+    setForm({
+      codigo: '',
+      descripcion: '',
+      tipo: 'Material',
+      unidad: 'pieza',
+      stockActual: 0,
+      stockMinimo: 10,
+      costoUnitario: 0,
+      moneda: 'MXN',
+      proveedorId: '',
+      notas: '',
+    });
+    setShowModal(true);
+  }
+
+  async function handleSubmitMaterial(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await post('/api/inventario/materiales', {
+        codigo: form.codigo,
+        descripcion: form.descripcion,
+        tipo: form.tipo,
+        unidad: form.unidad,
+        stockActual: Number(form.stockActual),
+        stockMinimo: Number(form.stockMinimo),
+        costoUnitario: Number(form.costoUnitario),
+        moneda: form.moneda,
+        proveedorId: form.proveedorId || undefined,
+        notas: form.notas || undefined,
+      });
+      setShowModal(false);
+      loadInventario(page, search, categoryFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al crear el material');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Stats calculations
   const totalProductos = meta?.total ?? items.length;
   const stockBajo = items.filter((m) => (m.stockActual ?? 0) > 0 && (m.stockActual ?? 0) <= (m.stockMinimo || 10)).length;
@@ -118,41 +191,58 @@ function InventarioContent() {
             Materiales, productos y servicios
           </p>
         </div>
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2" onClick={openNewMaterial}>
           <Plus className="h-4 w-4" />
           Nuevo Material
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards with borders */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Productos"
-          value={totalProductos}
-          icon={<Package className="h-4 w-4" />}
-          description="Registrados"
-        />
-        <StatCard
-          title="Stock Bajo"
-          value={stockBajo}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          variant="warning"
-          description="≤ stock mínimo"
-        />
-        <StatCard
-          title="Sin Stock"
-          value={sinStock}
-          icon={<XCircle className="h-4 w-4" />}
-          variant="destructive"
-          description="Stock en cero"
-        />
-        <StatCard
-          title="Valor Inventario"
-          value={formatCurrency(valorInventario)}
-          icon={<DollarSign className="h-4 w-4" />}
-          variant="success"
-          description="Costo × stock"
-        />
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <Package className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total Productos</p>
+              <p className="text-2xl font-bold tracking-tight">{totalProductos}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Stock Bajo</p>
+              <p className="text-2xl font-bold tracking-tight">{stockBajo}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <XCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Sin Stock</p>
+              <p className="text-2xl font-bold tracking-tight">{sinStock}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+              <DollarSign className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Valor Inventario</p>
+              <p className="text-2xl font-bold tracking-tight">{formatCurrency(valorInventario)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -233,10 +323,13 @@ function InventarioContent() {
                 return (
                   <TableRow key={m.id}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => router.push(`/inventario/${m.id}`)}
+                        className="flex items-center gap-1.5 text-primary hover:underline focus:outline-none"
+                      >
                         <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                         {m.codigo}
-                      </div>
+                      </button>
                     </TableCell>
                     <TableCell className="text-table">{m.descripcion}</TableCell>
                     <TableCell className="text-table text-muted-foreground">{m.unidad}</TableCell>
@@ -286,6 +379,168 @@ function InventarioContent() {
           </div>
         )}
       </TableContainer>
+
+      {/* New Material Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Nuevo Material</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitMaterial} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Código *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.codigo}
+                    onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                    className="input-base"
+                    placeholder="MAT-001"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Tipo
+                  </label>
+                  <select
+                    value={form.tipo}
+                    onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="Material">Material</option>
+                    <option value="Producto">Producto</option>
+                    <option value="Servicio">Servicio</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Descripción *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.descripcion}
+                  onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                  className="input-base"
+                  placeholder="Descripción del material"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Unidad
+                  </label>
+                  <select
+                    value={form.unidad}
+                    onChange={(e) => setForm({ ...form, unidad: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="pieza">Pieza</option>
+                    <option value="kg">Kg</option>
+                    <option value="m">Metro</option>
+                    <option value="litro">Litro</option>
+                    <option value="set">Set</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Stock Actual
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.stockActual}
+                    onChange={(e) => setForm({ ...form, stockActual: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Stock Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.stockMinimo}
+                    onChange={(e) => setForm({ ...form, stockMinimo: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Costo Unitario
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.costoUnitario}
+                    onChange={(e) => setForm({ ...form, costoUnitario: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Moneda
+                  </label>
+                  <select
+                    value={form.moneda}
+                    onChange={(e) => setForm({ ...form, moneda: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="MXN">MXN - Peso Mexicano</option>
+                    <option value="USD">USD - Dólar Americano</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={form.notas}
+                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Observaciones del material"
+                />
+              </div>
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Crear Material'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

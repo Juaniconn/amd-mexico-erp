@@ -158,14 +158,14 @@ function DashboardContent() {
         </button>
       </div>
 
-      {/* KPI Grid — compact card grid */}
+      {/* KPI Grid — compact card grid with borders */}
       <div>
         <h2 className="section-title mb-3">Métricas Principales</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {statCards.map((stat) => (
             <div
               key={stat.key}
-              className="card-premium flex flex-col gap-3 p-4"
+              className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

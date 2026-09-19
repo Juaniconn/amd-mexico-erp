@@ -30,7 +30,7 @@ import {
   Timer,
   ArrowRightLeft,
 } from 'lucide-react';
-import { get, OrdenTrabajo, ApiError } from '@/lib/api';
+import { get, post, OrdenTrabajo, ApiError } from '@/lib/api';
 
 const ESTATUS_OPTIONS = [
   { value: 'PENDIENTE', label: 'Pendiente' },
@@ -39,6 +39,19 @@ const ESTATUS_OPTIONS = [
   { value: 'COMPLETADA', label: 'Completada' },
   { value: 'CANCELADA', label: 'Cancelada' },
 ];
+
+interface OrdenTrabajoFormData {
+  piezaNombre: string;
+  piezaDescripcion: string;
+  cantidad: number;
+  unidad: string;
+  fechaInicio: string;
+  fechaFinEstimada: string;
+  prioridad: 'ALTA' | 'MEDIA' | 'BAJA';
+  notas: string;
+  responsableId?: string;
+  cotizacionId?: string;
+}
 
 const VERSION = '1.0.0';
 
@@ -85,6 +98,19 @@ function ProduccionContent() {
   const [estatusFilter, setEstatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState<OrdenTrabajoFormData>({
+    piezaNombre: '',
+    piezaDescripcion: '',
+    cantidad: 1,
+    unidad: 'pieza',
+    fechaInicio: '',
+    fechaFinEstimada: '',
+    prioridad: 'MEDIA',
+    notas: '',
+  });
 
   const loadOrdenes = useCallback(async (p = 1, s = '', e = '') => {
     try {
@@ -121,6 +147,44 @@ function ProduccionContent() {
     loadOrdenes(1, search, value);
   }
 
+  function openNewOT() {
+    setForm({
+      piezaNombre: '',
+      piezaDescripcion: '',
+      cantidad: 1,
+      unidad: 'pieza',
+      fechaInicio: '',
+      fechaFinEstimada: '',
+      prioridad: 'MEDIA',
+      notas: '',
+    });
+    setShowModal(true);
+  }
+
+  async function handleSubmitOT(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await post('/api/ordenes-trabajo', {
+        piezaNombre: form.piezaNombre,
+        piezaDescripcion: form.piezaDescripcion || undefined,
+        cantidad: Number(form.cantidad),
+        unidad: form.unidad,
+        fechaInicio: form.fechaInicio || undefined,
+        fechaFinEstimada: form.fechaFinEstimada || undefined,
+        prioridad: form.prioridad,
+        notas: form.notas || undefined,
+      });
+      setShowModal(false);
+      loadOrdenes(page, search, estatusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al crear la orden de trabajo');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Stats calculations
   const totalOrdenes = meta?.total ?? ordenes.length;
   const enProduccion = ordenes.filter((o) => o.estatus === 'EN_PRODUCCION' || o.estatus === 'CALIDAD').length;
@@ -140,38 +204,59 @@ function ProduccionContent() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2" onClick={openNewOT}>
             <Plus className="h-4 w-4" />
             Nueva OT
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards with borders */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Órdenes"
-          value={totalOrdenes}
-          icon={<ClipboardList className="h-4 w-4" />}
-        />
-        <StatCard
-          title="En Producción"
-          value={enProduccion}
-          icon={<Loader2 className="h-4 w-4" />}
-          variant="brand"
-        />
-        <StatCard
-          title="Completadas"
-          value={completadas}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          variant="success"
-        />
-        <StatCard
-          title="Tiempo prom."
-          value={`${tiempoProm} h`}
-          icon={<Timer className="h-4 w-4" />}
-          variant="warning"
-        />
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <ClipboardList className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total Órdenes</p>
+              <p className="text-2xl font-bold tracking-tight">{totalOrdenes}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <Loader2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">En Producción</p>
+              <p className="text-2xl font-bold tracking-tight">{enProduccion}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Completadas</p>
+              <p className="text-2xl font-bold tracking-tight">{completadas}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <Timer className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Tiempo prom.</p>
+              <p className="text-2xl font-bold tracking-tight">{tiempoProm} h</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -322,6 +407,150 @@ function ProduccionContent() {
           &copy; {new Date().getFullYear()} AMD México Operations ERP &middot; v{VERSION}
         </p>
       </footer>
+
+      {/* New OT Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Nueva Orden de Trabajo</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitOT} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Pieza / Producto *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.piezaNombre}
+                  onChange={(e) => setForm({ ...form, piezaNombre: e.target.value })}
+                  className="input-base"
+                  placeholder="Nombre de la pieza"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Descripción
+                </label>
+                <textarea
+                  value={form.piezaDescripcion}
+                  onChange={(e) => setForm({ ...form, piezaDescripcion: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Descripción de la pieza"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Cantidad *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={form.cantidad}
+                    onChange={(e) => setForm({ ...form, cantidad: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Unidad
+                  </label>
+                  <select
+                    value={form.unidad}
+                    onChange={(e) => setForm({ ...form, unidad: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="pieza">Pieza</option>
+                    <option value="kg">Kg</option>
+                    <option value="m">Metro</option>
+                    <option value="litro">Litro</option>
+                    <option value="set">Set</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Prioridad
+                  </label>
+                  <select
+                    value={form.prioridad}
+                    onChange={(e) => setForm({ ...form, prioridad: e.target.value as 'ALTA' | 'MEDIA' | 'BAJA' })}
+                    className="input-base"
+                  >
+                    <option value="ALTA">Alta</option>
+                    <option value="MEDIA">Media</option>
+                    <option value="BAJA">Baja</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Inicio
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaInicio}
+                    onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Fin Estimada
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaFinEstimada}
+                    onChange={(e) => setForm({ ...form, fechaFinEstimada: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={form.notas}
+                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Observaciones de la orden"
+                />
+              </div>
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Crear OT'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
