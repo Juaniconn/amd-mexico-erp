@@ -14,7 +14,7 @@ import { PrismaModule } from '../../database/prisma.module';  // ← Agregado
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET') || 'default-secret-change-me',
+        secret: config.get('JWT_SECRET') ,
         signOptions: {
           expiresIn: config.get('JWT_EXPIRES_IN') || '8h',
         },

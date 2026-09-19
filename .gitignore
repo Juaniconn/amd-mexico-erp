@@ -40,3 +40,4 @@ redis-data/
 minio-data/
 .env.docker
 .env.local.generated.json
+.env.docker.bak

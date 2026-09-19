@@ -33,18 +33,18 @@
 ### C1. Credenciales hardcodeadas en código fuente (RIESGO DE SEGURIDAD)
 
 **Ubicación:**
-- `apps/web/app/test/page.tsx:16` → `password: 'admin123'`
-- `apps/api/prisma/seed.ts:64` → `bcrypt.hash('admin123', 10)`
+- `apps/web/app/test/page.tsx:16` → `password: '[REDACTED]'`
+- `apps/api/prisma/seed.ts:64` → `bcrypt.hash('[REDACTED]', 10)`
 - `apps/api/prisma/seed.ts:80` → `console.log('✅ Usuario admin creado (admin@amd-mexico.com / admin123)')`
-- `apps/api/src/modules/auth/auth.module.ts:17` → `secret: config.get('JWT_SECRET') || 'default-secret-change-me'`
-- `apps/api/src/modules/auth/jwt.strategy.ts:12` → `secretOrKey: process.env.JWT_SECRET || 'default-secret-change-me'`
+- `apps/api/src/modules/auth/auth.module.ts:17` → `secret: config.get('JWT_SECRET') || '[REDACTED]'`
+- `apps/api/src/modules/auth/jwt.strategy.ts:12` → `secretOrKey: process.env.JWT_SECRET || '[REDACTED]'`
 
 **Impacto:** Credenciales expuestas en texto plano. Si el repositorio se filtra, un atacante tiene acceso inmediato al usuario admin con una contraseña conocida.
 
 **Recomendación:**
 1. Eliminar la página de test (`apps/web/app/test/page.tsx`) del repositorio de producción.
 2. Mover la contraseña del seed a variable de entorno con valor aleatorio generado en el primer deploy.
-3. Eliminar los fallback secrets `'default-secret-change-me'` — fallar si `JWT_SECRET` no está definido.
+3. Eliminar los fallback secrets `'[REDACTED]'` — fallar si `JWT_SECRET` no está definido.
 
 ---
 
@@ -55,11 +55,11 @@
 **Contenido:**
 ```json
 {
-  "db": "vfqz1vlsggrzifgbqoafxnch3vkzsnzrunhatoubasylirgx",
-  "minio": "f3qrxpwgjy1rma6jqzpbjvpfhix86r3ug4nx0qvsuu8794cu",
-  "jwt": "ujyb3knz9ukzdqf5osuenym8p8vfb67hz52oitnz5lznz4ty",
-  "jwt_refresh": "jihznvxtac0susitjtb6cz7egxnirg5zbb1ysgqvf3ow0ibt",
-  "redis": "1enn2855ys3t9c0xb5pw7vsh"
+  "db": "[REDACTED]",
+  "minio": "[REDACTED]",
+  "jwt": "[REDACTED]",
+  "jwt_refresh": "[REDACTED]",
+  "redis": "[REDACTED]"
 }
 ```
 
@@ -366,7 +366,7 @@ get<{ data: { meta: { total: number } } }>('/api/operaciones?limit=1'),
 **Ubicación:** `apps/api/prisma/seed.ts:64`
 
 ```typescript
-const passwordHash = await bcrypt.hash('admin123', 10);
+const passwordHash = await bcrypt.hash('[REDACTED]', 10);
 ```
 
 **Impacto:** Contraseña predecible. Si el seed se ejecuta en producción sin cambiar la contraseña, es un riesgo.
@@ -635,8 +635,8 @@ Justificación:
 ## 📋 CHECKLIST DE ACCIONES INMEDIATAS
 
 - [ ] **HOY:** Eliminar `apps/web/app/test/page.tsx`
-- [ ] **HOY:** Cambiar `'admin123'` por variable de entorno en seed
-- [ ] **HOY:** Eliminar `'default-secret-change-me'` de auth module y strategy
+- [ ] **HOY:** Cambiar `'[REDACTED]'` por variable de entorno en seed
+- [ ] **HOY:** Eliminar `'[REDACTED]'` de auth module y strategy
 - [ [ ] **HOY:** Añadir `.env.local.generated.json` a `.gitignore`
 - [ ] **HOY:** Unificar docker-compose.internal.yml con docker-compose.yml
 - [ ] **ESTA SEMANA:** Corregir CORS en main.ts
