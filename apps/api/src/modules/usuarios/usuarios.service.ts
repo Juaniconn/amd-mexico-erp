@@ -20,7 +20,6 @@ export class UsuariosService {
     const skip = (page - 1) * limit;
     const where = search
       ? {
-          activo: true,
           OR: [
             { nombre: { contains: search, mode: 'insensitive' as const } },
             { apellido: { contains: search, mode: 'insensitive' as const } },
@@ -28,7 +27,7 @@ export class UsuariosService {
             { username: { contains: search, mode: 'insensitive' as const } },
           ],
         }
-      : { activo: true };
+      : {};
 
     const [usuarios, total] = await Promise.all([
       this.prisma.usuario.findMany({

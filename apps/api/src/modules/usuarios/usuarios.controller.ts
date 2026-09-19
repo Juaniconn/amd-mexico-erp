@@ -43,11 +43,7 @@ export class UsuariosController {
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    const result = await this.usuariosService.findAll(pageNum, limitNum, search);
-    return {
-      statusCode: HttpStatus.OK,
-      data: result,
-    };
+    return this.usuariosService.findAll(pageNum, limitNum, search);
   }
 
   @Get(':id')

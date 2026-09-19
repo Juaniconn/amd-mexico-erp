@@ -72,8 +72,8 @@ export default function UsuariosPage() {
     try {
       setLoading(true);
       setError('');
-      const data = await get<Usuario[]>('/api/usuarios');
-      setUsuarios(data);
+      const response = await get<{ data: Usuario[]; meta: { total: number } }>('/api/usuarios?limit=100');
+      setUsuarios(response.data || []);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar usuarios');
     } finally {
