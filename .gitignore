@@ -41,3 +41,24 @@ minio-data/
 .env.docker
 .env.local.generated.json
 .env.docker.bak
+
+# Env files (solo .env.example es seguro)
+.env
+.env.*
+!.env.example
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Secrets and credentials
+secrets/
+credentials/
+*.secret
+*.key
+*.pem
+
+# Subagent generated reports
+AUDIT_REPORT.md
+SECURITY_REPORT.md
