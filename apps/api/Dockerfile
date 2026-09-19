@@ -19,7 +19,4 @@ ENV API_PORT=3001
 ENV PORT=3001
 EXPOSE 3001
 
-# Script de entrada que construye URLs dinámicamente
-COPY apps/api/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-CMD ["/app/entrypoint.sh"]
+CMD ["node", "apps/api/dist/main.js"]
