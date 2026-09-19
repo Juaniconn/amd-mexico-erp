@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { get } from '@/lib/api';
 import { AppLayout } from '@/components/AppLayout';
-import { StatCard, StatGrid } from '@/components/StatCard';
 import { LoadingState, ErrorState } from '@/components/States';
 import { SearchFilterBar } from '@/components/SearchFilterBar';
 import {
@@ -19,6 +18,7 @@ import {
   BarChart3,
   Calendar,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface DashboardStats {
   clientes: number;
@@ -109,6 +109,15 @@ function BarChartPanel({
   );
 }
 
+// Metric card configuration
+interface MetricCardConfig {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
+}
+
 export default function ReportesPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +147,79 @@ export default function ReportesPage() {
     month: 'long',
     day: 'numeric',
   });
+
+  const financialKPIs: MetricCardConfig[] = stats
+    ? [
+        {
+          label: 'Total Ventas',
+          value: formatCurrency(stats.totalVentas),
+          icon: DollarSign,
+          iconBg: 'bg-success/10',
+          iconColor: 'text-success',
+        },
+        {
+          label: 'Total Compras',
+          value: formatCurrency(stats.totalCompras),
+          icon: TrendingUp,
+          iconBg: 'bg-brand/10',
+          iconColor: 'text-brand',
+        },
+      ]
+    : [];
+
+  const generalMetrics: MetricCardConfig[] = stats
+    ? [
+        {
+          label: 'Clientes',
+          value: stats.clientes,
+          icon: Users,
+          iconBg: 'bg-brand/10',
+          iconColor: 'text-brand',
+        },
+        {
+          label: 'Cotizaciones',
+          value: stats.cotizaciones,
+          icon: FileText,
+          iconBg: 'bg-brand/10',
+          iconColor: 'text-brand',
+        },
+        {
+          label: 'Órdenes Compra',
+          value: stats.ordenesCompra,
+          icon: ShoppingCart,
+          iconBg: 'bg-warning/10',
+          iconColor: 'text-warning',
+        },
+        {
+          label: 'Órdenes Trabajo',
+          value: stats.ordenesTrabajo,
+          icon: Wrench,
+          iconBg: 'bg-warning/10',
+          iconColor: 'text-warning',
+        },
+        {
+          label: 'Materiales',
+          value: stats.materiales,
+          icon: Package,
+          iconBg: 'bg-muted',
+          iconColor: 'text-muted-foreground',
+        },
+        {
+          label: 'Proveedores',
+          value: stats.proveedores,
+          icon: Truck,
+          iconBg: 'bg-muted',
+          iconColor: 'text-muted-foreground',
+        },
+        {
+          label: 'Operaciones',
+          value: stats.operaciones,
+          icon: Settings,
+          iconBg: 'bg-success/10',
+          iconColor: 'text-success',
+        },
+      ]
+    : [];
 
   return (
     <AppLayout>
@@ -181,72 +263,50 @@ export default function ReportesPage() {
             <div>
               <h2 className="section-title mb-3">Indicadores Financieros</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <StatCard
-                  title="Total Ventas"
-                  value={formatCurrency(stats.totalVentas)}
-                  icon={<DollarSign className="h-5 w-5" />}
-                  variant="success"
-                  trend={12}
-                  trendLabel="vs mes anterior"
-                />
-                <StatCard
-                  title="Total Compras"
-                  value={formatCurrency(stats.totalCompras)}
-                  icon={<TrendingUp className="h-5 w-5" />}
-                  variant="brand"
-                  trend={8}
-                  trendLabel="vs mes anterior"
-                />
+                {financialKPIs.map((kpi) => (
+                  <div
+                    key={kpi.label}
+                    className="flex items-center gap-4 border border-border bg-card rounded-xl p-4"
+                  >
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${kpi.iconBg}`}>
+                      <kpi.icon className={`h-5 w-5 ${kpi.iconColor}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        {kpi.label}
+                      </p>
+                      <p className="truncate text-2xl font-bold text-foreground">
+                        {kpi.value}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Main KPIs Grid */}
             <div>
               <h2 className="section-title mb-3">Métricas Generales</h2>
-              <StatGrid cols={4}>
-                <StatCard
-                  title="Clientes"
-                  value={stats.clientes}
-                  icon={<Users className="h-5 w-5" />}
-                  variant="default"
-                />
-                <StatCard
-                  title="Cotizaciones"
-                  value={stats.cotizaciones}
-                  icon={<FileText className="h-5 w-5" />}
-                  variant="brand"
-                />
-                <StatCard
-                  title="Órdenes Compra"
-                  value={stats.ordenesCompra}
-                  icon={<ShoppingCart className="h-5 w-5" />}
-                  variant="default"
-                />
-                <StatCard
-                  title="Órdenes Trabajo"
-                  value={stats.ordenesTrabajo}
-                  icon={<Wrench className="h-5 w-5" />}
-                  variant="warning"
-                />
-                <StatCard
-                  title="Materiales"
-                  value={stats.materiales}
-                  icon={<Package className="h-5 w-5" />}
-                  variant="default"
-                />
-                <StatCard
-                  title="Proveedores"
-                  value={stats.proveedores}
-                  icon={<Truck className="h-5 w-5" />}
-                  variant="default"
-                />
-                <StatCard
-                  title="Operaciones"
-                  value={stats.operaciones}
-                  icon={<Settings className="h-5 w-5" />}
-                  variant="success"
-                />
-              </StatGrid>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {generalMetrics.map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="flex flex-col gap-3 border border-border bg-card rounded-xl p-4"
+                  >
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${metric.iconBg}`}>
+                      <metric.icon className={`h-4 w-4 ${metric.iconColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        {metric.label}
+                      </p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {metric.value}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Charts */}

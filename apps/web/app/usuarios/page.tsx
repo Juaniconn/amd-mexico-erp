@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { StatCard, StatGrid } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -394,32 +393,59 @@ export default function UsuariosPage() {
         />
 
         {/* Stats Row */}
-        <StatGrid cols={4}>
-          <StatCard
-            title="Total"
-            value={totalUsuarios}
-            icon={<Users className="h-4 w-4" />}
-            variant="default"
-          />
-          <StatCard
-            title="Activos"
-            value={activos}
-            icon={<UserCheck className="h-4 w-4" />}
-            variant="success"
-          />
-          <StatCard
-            title="Admins"
-            value={admins}
-            icon={<Shield className="h-4 w-4" />}
-            variant="brand"
-          />
-          <StatCard
-            title="Inactivos"
-            value={inactivos}
-            icon={<UserX className="h-4 w-4" />}
-            variant="danger"
-          />
-        </StatGrid>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {/* Total */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold text-foreground">{totalUsuarios}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Activos */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                <UserCheck className="h-5 w-5 text-success" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Activos</p>
+                <p className="text-2xl font-bold text-foreground">{activos}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Admins */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10">
+                <Shield className="h-5 w-5 text-brand" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Admins</p>
+                <p className="text-2xl font-bold text-foreground">{admins}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Inactivos */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger/10">
+                <UserX className="h-5 w-5 text-danger" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Inactivos</p>
+                <p className="text-2xl font-bold text-foreground">{inactivos}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Table */}
         <TableContainer>
