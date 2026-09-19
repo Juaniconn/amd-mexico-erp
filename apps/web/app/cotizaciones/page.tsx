@@ -25,7 +25,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { get, put, del, post } from '@/lib/api';
-import type { Cotizacion } from '@/types';
+import type { Cotizacion, CotizacionWithParts, DetalleCotizacion } from '@/types';
 
 interface CotizacionFormData {
   clienteId: string;
@@ -108,9 +108,11 @@ function CotizacionesContent() {
 
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [clientes, setClientes] = useState<{ id: string; razonSocial: string; monedaPref: string }[]>([]);
   const [editingCotizacion, setEditingCotizacion] = useState<CotizacionListItem | null>(null);
+  const [detailCotizacion, setDetailCotizacion] = useState<CotizacionWithParts | null>(null);
 
   const [form, setForm] = useState<CotizacionFormData>({
     clienteId: '',
@@ -202,15 +204,63 @@ function CotizacionesContent() {
     setEditForm({
       clienteId: c.clienteId || '',
       moneda: c.moneda || 'MXN',
-      fechaEntrega: c.fechaEntrega || '',
+      fechaEntrega: (c as any).fechaEntrega || '',
       notas: c.notas || '',
-      lineas: c.detalles?.map((l: any) => ({
+      lineas: (c as any).detalles?.map((l: any) => ({
         descripcion: l.descripcion || l.piezaNombre || '',
         cantidad: l.cantidad || 1,
         unidad: l.unidad || 'PZA',
         precioUnitario: l.precioUnitario || 0,
       })) || [],
     });
+    setShowEditModal(true);
+    get<{ data: { id: string; razonSocial: string; monedaPref: string }[] }>('/api/clientes?limit=100')
+      .then((res) => setClientes(res.data))
+      .catch(() => {});
+  }
+
+  async function openDetailCard(c: CotizacionListItem) {
+    setDetailCotizacion(null);
+    setShowDetailModal(true);
+    try {
+      const res = await get<CotizacionWithParts>(`/api/cotizaciones/${c.id}`);
+      setDetailCotizacion(res);
+    } catch (err: any) {
+      setError(err?.message || 'Error al cargar cotización');
+      setShowDetailModal(false);
+    }
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailCotizacion) return;
+    if (!confirm('¿Está seguro de eliminar esta cotización?')) return;
+    try {
+      setError('');
+      await del(`/api/cotizaciones/${detailCotizacion.id}`);
+      setShowDetailModal(false);
+      setDetailCotizacion(null);
+      loadCotizaciones(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailCotizacion) return;
+    setEditingCotizacion(detailCotizacion);
+    setEditForm({
+      clienteId: detailCotizacion.clienteId || '',
+      moneda: detailCotizacion.moneda || 'MXN',
+      fechaEntrega: (detailCotizacion as any).fechaEntrega || '',
+      notas: detailCotizacion.notas || '',
+      lineas: (detailCotizacion.detalles || []).map((d: DetalleCotizacion) => ({
+        descripcion: d.piezaNombre || '',
+        cantidad: d.cantidad || 1,
+        unidad: d.unidad || 'PZA',
+        precioUnitario: Number(d.precioUnitario) || 0,
+      })),
+    });
+    setShowDetailModal(false);
     setShowEditModal(true);
     get<{ data: { id: string; razonSocial: string; monedaPref: string }[] }>('/api/clientes?limit=100')
       .then((res) => setClientes(res.data))
@@ -453,7 +503,8 @@ function CotizacionesContent() {
             {cotizaciones.map((c) => (
               <div
                 key={c.id}
-                className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+                onClick={() => openDetailCard(c)}
+                className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between gap-3">
@@ -462,12 +513,7 @@ function CotizacionesContent() {
                       <Hash className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <button
-                        onClick={() => router.push(`/cotizaciones/${c.id}`)}
-                        className="truncate text-sm font-semibold text-foreground hover:text-brand transition-colors"
-                      >
-                        {c.folio}
-                      </button>
+                      <h3 className="truncate text-sm font-semibold text-foreground">{c.folio}</h3>
                       <p className="text-xs text-muted-foreground truncate">{c.razonSocial || '—'}</p>
                     </div>
                   </div>
@@ -498,11 +544,12 @@ function CotizacionesContent() {
 
                 {/* Card Footer */}
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => router.push(`/cotizaciones/${c.id}`)}
+                      onClick={(e) => { e.stopPropagation(); openDetailCard(c); }}
                       title="Ver detalle"
                     >
                       <Eye className="h-3.5 w-3.5" />
@@ -510,26 +557,15 @@ function CotizacionesContent() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => openEditCotizacion(c)}
+                      onClick={(e) => { e.stopPropagation(); openEditCotizacion(c); }}
                       title="Editar cotización"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    {(c.estatus === 'BORRADOR' || c.estatus === 'EN_REVISION') && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleSend(c.id)}
-                        title="Enviar cotización"
-                        className="text-success hover:text-success"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => handleDelete(c.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                       title="Eliminar cotización"
                       className="text-destructive hover:text-destructive"
                     >
@@ -962,6 +998,163 @@ function CotizacionesContent() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal — shows full cotizacion info with actions */}
+      {showDetailModal && detailCotizacion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">{detailCotizacion.folio}</h2>
+                <p className="text-xs text-muted-foreground">{detailCotizacion.cliente?.razonSocial || '—'}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setDetailCotizacion(null);
+                }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Info Grid */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="section-title">Cliente</p>
+                  <p className="text-sm text-foreground">{detailCotizacion.cliente?.razonSocial || '—'}</p>
+                </div>
+                <div>
+                  <p className="section-title">Moneda</p>
+                  <p className="text-sm text-foreground">{detailCotizacion.moneda}</p>
+                </div>
+                <div>
+                  <p className="section-title">Estatus</p>
+                  <Badge variant={STATUS_VARIANTS[detailCotizacion.estatus] || 'secondary'}>
+                    {STATUS_LABELS[detailCotizacion.estatus] || detailCotizacion.estatus}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="section-title">Fecha</p>
+                  <p className="text-sm text-foreground">{formatDate(detailCotizacion.createdAt || (detailCotizacion as any).fecha)}</p>
+                </div>
+                <div>
+                  <p className="section-title">Validez</p>
+                  <p className="text-sm text-foreground">{detailCotizacion.validez} días</p>
+                </div>
+                {detailCotizacion.tipoCambio && Number(detailCotizacion.tipoCambio) > 0 && (
+                  <div>
+                    <p className="section-title">Tipo Cambio</p>
+                    <p className="text-sm text-foreground">{Number(detailCotizacion.tipoCambio).toFixed(4)}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Totals */}
+              <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="section-title">Subtotal</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatCurrency(Number(detailCotizacion.subtotal) || 0, detailCotizacion.moneda)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="section-title">IVA</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatCurrency(Number(detailCotizacion.iva) || 0, detailCotizacion.moneda)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="section-title">Total</p>
+                    <p className="text-lg font-bold text-brand">
+                      {formatCurrency(Number(detailCotizacion.total) || 0, detailCotizacion.moneda)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detalles/Partidas */}
+              {detailCotizacion.detalles && detailCotizacion.detalles.length > 0 && (
+                <div>
+                  <p className="section-title mb-2">Partidas ({detailCotizacion.detalles.length})</p>
+                  <div className="space-y-2">
+                    {detailCotizacion.detalles.map((d: DetalleCotizacion, i: number) => (
+                      <div key={d.id || i} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground truncate">{d.piezaNombre}</p>
+                          {d.piezaDescripcion && (
+                            <p className="text-xs text-muted-foreground truncate">{d.piezaDescripcion}</p>
+                          )}
+                          {d.procesoRequerido && (
+                            <p className="text-xs text-muted-foreground">⚙ {d.procesoRequerido}</p>
+                          )}
+                        </div>
+                        <div className="ml-3 text-right shrink-0">
+                          <p className="text-xs text-muted-foreground">{d.cantidad} {d.unidad}</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {formatCurrency(Number(d.subtotal) || 0, detailCotizacion.moneda)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notas */}
+              {detailCotizacion.notas && (
+                <div>
+                  <p className="section-title">Notas</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{detailCotizacion.notas}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    setDetailCotizacion(null);
+                    router.push(`/cotizaciones/${detailCotizacion.id}`);
+                  }}
+                  className="gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  Ver página completa
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openEditFromDetail}
+                    className="gap-2"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteFromDetail}
+                    className="gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
