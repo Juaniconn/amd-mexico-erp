@@ -36,7 +36,7 @@ import {
 import { IngenieriaProyecto, EnumIngenieriaEstatus } from '@/types';
 import { UploadPlanoModal } from '../components/UploadPlanoModal';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 function getBadgeVariant(status: EnumIngenieriaEstatus): string {
   const variants: Record<EnumIngenieriaEstatus, string> = {
@@ -78,7 +78,7 @@ export default function IngenieriaDetallePage() {
   const fetchProyecto = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_URL}/api/ingenieria/${id}`, {
+      const res = await fetch(`${API_URL}/ingenieria/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -104,7 +104,7 @@ export default function IngenieriaDetallePage() {
     setActionLoading(action);
     try {
       const token = localStorage.getItem('accessToken');
-      let url = `${API_URL}/api/ingenieria/${id}`;
+      let url = `${API_URL}/ingenieria/${id}`;
       
       if (action === 'iniciar_diseno') {
         url += '';

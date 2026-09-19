@@ -1,28 +1,21 @@
-FROM node:20-bookworm
-
+FROM node:20-bookworm-slim
 WORKDIR /app
 
-RUN npm install -g pnpm
+# Instalar libssl3 (requerido por Prisma query engine en ARM64)
+RUN apt-get update && apt-get install -y libssl3 && rm -rf /var/lib/apt/lists/*
 
-# Copiar configuración de pnpm y workspaces
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY .npmrc /root/.npmrc
-COPY apps/api/package.json ./apps/api/
-COPY packages/shared/package.json ./packages/shared/
+# Copiar node_modules ya instalados (con symlinks de pnpm del host)
+COPY node_modules ./node_modules
+COPY apps/api/node_modules ./apps/api/node_modules
 
-RUN pnpm install --no-frozen-lockfile --ignore-scripts
+# Copilar app pre-compilada y prisma schema
+COPY apps/api/dist ./apps/api/dist
+COPY apps/api/prisma ./apps/api/prisma
+COPY packages/shared ./packages/shared
 
-
-COPY apps/api ./apps/api
-COPY packages/shared ./packages/shared/
-
-# Prisma client se genera en el paso de build con --ignore-scripts
-RUN cd apps/api && npx prisma generate --schema prisma/schema.prisma
-
-# Set DATABASE_URL to localhost for container runtime (overrides .env)
-ENV DATABASE_URL=postgresql://erp:${POSTGRES_PASSWORD:-erp_password}@127.0.0.1:5432/erp_db
-RUN pnpm --filter @amd/api build
-
+# Runtime
+ENV NODE_ENV=production
+ENV API_PORT=3001
+ENV PORT=3001
 EXPOSE 3001
-
 CMD ["node", "apps/api/dist/main.js"]

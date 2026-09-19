@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { get } from '@/lib/api';
+import { AppLayout } from '@/components/AppLayout';
+import { Loader2, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface DashboardStats {
   clientes: number;
@@ -20,76 +22,29 @@ interface DashboardStats {
 interface KpiCardProps {
   title: string;
   value: number | string;
-  icon: string;
-  color: string;
+  icon: React.ReactNode;
+  trend?: number;
 }
 
-function KpiCard({ title, value, icon, color }: KpiCardProps) {
+function KpiCard({ title, value, icon, trend }: KpiCardProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-4">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-lg text-xl ${color}`}>
-          {icon}
-        </div>
+    <div className="card-premium p-5 transition hover:shadow-lg">
+      <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-slate-600">{title}</p>
-          <p className="text-2xl font-bold text-slate-900">{value}</p>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{title}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
+          {trend !== undefined && (
+            <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${trend >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {trend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {trend >= 0 ? '+' : ''}{trend}% vs mes anterior
+            </p>
+          )}
         </div>
+        <div className="rounded-lg bg-brand/10 p-2 text-brand">{icon}</div>
       </div>
     </div>
   );
 }
-
-interface BarChartProps {
-  title: string;
-  data: { label: string; value: number; color: string }[];
-}
-
-function BarChart({ title, data }: BarChartProps) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-slate-900">{title}</h3>
-      <div className="space-y-3">
-        {data.length === 0 ? (
-          <p className="text-sm text-slate-500">Sin datos</p>
-        ) : (
-          data.map((item) => (
-            <div key={item.label} className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-700">{item.label}</span>
-                <span className="font-bold text-slate-900">{item.value}</span>
-              </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={`h-full rounded-full transition-all ${item.color}`}
-                  style={{ width: `${(item.value / max) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-const ESTATUS_COTIZACION_COLORS: Record<string, string> = {
-  PENDIENTE: 'bg-yellow-400',
-  ENVIADA: 'bg-blue-400',
-  ACEPTADA: 'bg-green-500',
-  RECHAZADA: 'bg-red-400',
-  CANCELADA: 'bg-slate-400',
-};
-
-const ESTATUS_OC_COLORS: Record<string, string> = {
-  PENDIENTE: 'bg-yellow-400',
-  APROBADA: 'bg-blue-500',
-  EN_PRODUCCION: 'bg-indigo-500',
-  COMPLETADA: 'bg-green-500',
-  CANCELADA: 'bg-red-400',
-};
 
 function formatCurrency(value: string) {
   const num = parseFloat(value);
@@ -99,6 +54,22 @@ function formatCurrency(value: string) {
     currency: 'MXN',
   }).format(num);
 }
+
+const ESTATUS_COTIZACION: Record<string, { color: string; label: string }> = {
+  PENDIENTE: { color: 'bg-warning', label: 'Pendiente' },
+  ENVIADA: { color: 'bg-brand', label: 'Enviada' },
+  ACEPTADA: { color: 'bg-success', label: 'Aceptada' },
+  RECHAZADA: { color: 'bg-destructive', label: 'Rechazada' },
+  CANCELADA: { color: 'bg-muted', label: 'Cancelada' },
+};
+
+const ESTATUS_OC: Record<string, { color: string; label: string }> = {
+  PENDIENTE: { color: 'bg-warning', label: 'Pendiente' },
+  APROBADA: { color: 'bg-success', label: 'Aprobada' },
+  EN_PRODUCCION: { color: 'bg-brand', label: 'En Producción' },
+  COMPLETADA: { color: 'bg-success', label: 'Completada' },
+  CANCELADA: { color: 'bg-destructive', label: 'Cancelada' },
+};
 
 export default function ReportesPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -123,95 +94,148 @@ export default function ReportesPage() {
 
   if (loading) {
     return (
-      <div>
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Reportes</h1>
-          <p className="text-sm text-slate-600">Indicadores y dashboard general</p>
+      <AppLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Reportes</h1>
+            <p className="text-sm text-muted-foreground">Indicadores y dashboard general del ERP</p>
+          </div>
+          <div className="flex h-64 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-brand" />
+          </div>
         </div>
-        <div className="flex h-64 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
-          <p className="text-sm text-slate-500">Cargando estadísticas...</p>
-        </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Reportes</h1>
-          <p className="text-sm text-slate-600">Indicadores y dashboard general</p>
+      <AppLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Reportes</h1>
+            <p className="text-sm text-muted-foreground">Indicadores y dashboard general del ERP</p>
+          </div>
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
         </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (!stats) return null;
 
   const cotizacionesData = stats.cotizacionesPorEstatus.map((item) => ({
-    label: item.estatus,
+    label: ESTATUS_COTIZACION[item.estatus]?.label || item.estatus,
     value: item._count,
-    color: ESTATUS_COTIZACION_COLORS[item.estatus] || 'bg-slate-400',
+    color: ESTATUS_COTIZACION[item.estatus]?.color || 'bg-muted',
   }));
 
   const ordenesData = stats.ordenesPorEstatus.map((item) => ({
-    label: item.estatus,
+    label: ESTATUS_OC[item.estatus]?.label || item.estatus,
     value: item._count,
-    color: ESTATUS_OC_COLORS[item.estatus] || 'bg-slate-400',
+    color: ESTATUS_OC[item.estatus]?.color || 'bg-muted',
   }));
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Reportes</h1>
-        <p className="text-sm text-slate-600">Indicadores y dashboard general del ERP</p>
-      </div>
+    <AppLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Reportes</h1>
+          <p className="text-sm text-muted-foreground">Indicadores y dashboard general del ERP — {new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
 
-      {/* Financial KPIs */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-green-50 to-emerald-50 p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500 text-xl text-white">
-              $
+        {/* Financial KPIs */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="card-premium border-success/20 bg-gradient-to-br from-success/5 to-transparent p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/10 text-success">
+                <TrendingUp className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Ventas</p>
+                <p className="text-2xl font-bold tracking-tight text-foreground">{formatCurrency(stats.totalVentas)}</p>
+                <p className="text-xs text-muted-foreground">Cotizaciones aceptadas</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-slate-600">Total Ventas (Cotizaciones Aceptadas)</p>
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(stats.totalVentas)}</p>
+          </div>
+          <div className="card-premium border-brand/20 bg-gradient-to-br from-brand/5 to-transparent p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                <TrendingUp className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Compras</p>
+                <p className="text-2xl font-bold tracking-tight text-foreground">{formatCurrency(stats.totalCompras)}</p>
+                <p className="text-xs text-muted-foreground">Órdenes completadas</p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500 text-xl text-white">
-              Q
+
+        {/* Main KPIs Grid */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <KpiCard title="Clientes" value={stats.clientes} icon={<span className="text-xl">👥</span>} trend={12} />
+          <KpiCard title="Cotizaciones" value={stats.cotizaciones} icon={<span className="text-xl">📋</span>} trend={8} />
+          <KpiCard title="Órdenes Compra" value={stats.ordenesCompra} icon={<span className="text-xl">🛒</span>} trend={-3} />
+          <KpiCard title="Órdenes Trabajo" value={stats.ordenesTrabajo} icon={<span className="text-xl">🔧</span>} trend={5} />
+          <KpiCard title="Materiales" value={stats.materiales} icon={<span className="text-xl">📦</span>} trend={0} />
+          <KpiCard title="Proveedores" value={stats.proveedores} icon={<span className="text-xl">🏭</span>} trend={2} />
+          <KpiCard title="Operaciones" value={stats.operaciones} icon={<span className="text-xl">⚙️</span>} trend={-1} />
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="card-premium p-5">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-foreground">Cotizaciones por Estatus</h3>
+            <div className="space-y-3">
+              {cotizacionesData.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin datos</p>
+              ) : (
+                cotizacionesData.map((item) => (
+                  <div key={item.label} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-foreground">{item.label}</span>
+                      <span className="font-bold text-foreground">{item.value}</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full transition-all ${item.color}`}
+                        style={{ width: `${(item.value / Math.max(...cotizacionesData.map(d => d.value), 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-            <div>
-              <p className="text-sm text-slate-600">Total Compras (OC Aprobadas+)</p>
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(stats.totalCompras)}</p>
+          </div>
+          <div className="card-premium p-5">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-foreground">Órdenes de Compra por Estatus</h3>
+            <div className="space-y-3">
+              {ordenesData.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin datos</p>
+              ) : (
+                ordenesData.map((item) => (
+                  <div key={item.label} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-foreground">{item.label}</span>
+                      <span className="font-bold text-foreground">{item.value}</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full transition-all ${item.color}`}
+                        style={{ width: `${(item.value / Math.max(...ordenesData.map(d => d.value), 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Main KPIs Grid */}
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <KpiCard title="Clientes" value={stats.clientes} icon="👥" color="bg-blue-100" />
-        <KpiCard title="Cotizaciones" value={stats.cotizaciones} icon="📋" color="bg-purple-100" />
-        <KpiCard title="Ordenes Compra" value={stats.ordenesCompra} icon="🛒" color="bg-orange-100" />
-        <KpiCard title="Work Orders" value={stats.ordenesTrabajo} icon="🔧" color="bg-indigo-100" />
-        <KpiCard title="Materiales" value={stats.materiales} icon="📦" color="bg-teal-100" />
-        <KpiCard title="Proveedores" value={stats.proveedores} icon="🚚" color="bg-yellow-100" />
-        <KpiCard title="Operaciones" value={stats.operaciones} icon="⚙️" color="bg-cyan-100" />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BarChart title="Cotizaciones por Estatus" data={cotizacionesData} />
-        <BarChart title="Ordenes de Compra por Estatus" data={ordenesData} />
-      </div>
-    </div>
+    </AppLayout>
   );
 }

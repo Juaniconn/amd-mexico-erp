@@ -70,7 +70,7 @@ function DashboardContent() {
       get<{ data: { meta: { total: number } } }>('/api/cotizaciones?limit=1'),
       get<{ data: { meta: { total: number } } }>('/api/ordenes-compra?limit=1'),
       get<{ data: { meta: { total: number } } }>('/api/ordenes-trabajo?limit=1'),
-      get<{ data: { meta: { total: number } } }>('/api/materiales?limit=1'),
+      get<{ data: { meta: { total: number } } }>('/api/inventario/materiales?limit=1'),
       get<{ data: { meta: { total: number } } }>('/api/proveedores?limit=1'),
       get<{ data: { meta: { total: number } } }>('/api/operaciones?limit=1'),
     ])

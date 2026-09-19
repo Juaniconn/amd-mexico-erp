@@ -49,7 +49,7 @@ const modules = [
     { href: '/reportes', icon: BarChart3, label: 'Reportes' },
   ]},
   { section: 'Sistema', items: [
-    { href: '/settings/users', icon: Shield, label: 'Usuarios' },
+    { href: '/usuarios', icon: Shield, label: 'Usuarios' },
   ]},
 ];
 

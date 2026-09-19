@@ -15,7 +15,7 @@ const titles: Record<string, string> = {
   '/proveedores': 'Proveedores',
   '/calidad': 'Calidad',
   '/reportes': 'Reportes',
-  '/settings/users': 'Usuarios',
+  '/usuarios': 'Usuarios',
 };
 
 // Notification types

@@ -12,6 +12,7 @@ import { ComprasModule } from './modules/compras/compras.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
 import { ConfiguracionModule } from './modules/configuracion/configuracion.module';
 import { IngenieriaModule } from './modules/ingenieria/ingenieria.module';
+import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { IngenieriaModule } from './modules/ingenieria/ingenieria.module';
     }),
     PrismaModule,
     AuthModule,
+    UsuariosModule,
     ClientesModule,
     ProveedoresModule,
     CotizacionesModule,

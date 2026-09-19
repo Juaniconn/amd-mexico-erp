@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export interface OrdenTrabajo {
   id: string;
@@ -177,7 +177,7 @@ export async function uploadPlano(
   formData.append('version', String(version));
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-  const res = await fetch(`${API_URL}/api/ingenieria/${proyectoId}/planos`, {
+  const res = await fetch(`${API_URL}/ingenieria/${proyectoId}/planos`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,

@@ -1,9 +1,9 @@
-node_modules
-**/node_modules
+# Docker ignore para build del API
 **/.next
-**/dist
 **/.git
 **/.env*
+!/.env
+!apps/api/.env
 **/backups
 **/infra
 **/docs
@@ -22,3 +22,9 @@ tmp
 *.tmp
 *.log
 .DS_Store
+
+# Permitir node_modules (necesario para copiar deps al contenedor)
+!node_modules
+!apps/api/node_modules
+!apps/web/node_modules
+!packages/shared/node_modules
