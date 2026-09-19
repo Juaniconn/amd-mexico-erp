@@ -59,17 +59,17 @@ export default function MaterialDetailPage() {
     try {
       setLoading(true);
       setError('');
-      const res = await get<{ data: Material }>(`/api/inventario/materiales/${id}`);
-      setMaterial(res.data);
+      const material = await get<Material>(`/api/inventario/materiales/${id}`);
+      setMaterial(material);
       setForm({
-        descripcion: res.data.descripcion || '',
-        tipo: res.data.tipo || 'Material',
-        unidad: res.data.unidad || 'pieza',
-        stockActual: Number(res.data.stockActual ?? 0),
-        stockMinimo: Number(res.data.stockMinimo ?? 10),
-        costoUnitario: Number(res.data.costoUnitario ?? 0),
-        moneda: res.data.moneda || 'MXN',
-        notas: (res.data as any).notas || '',
+        descripcion: material.descripcion || '',
+        tipo: material.tipo || 'Material',
+        unidad: material.unidad || 'pieza',
+        stockActual: Number(material.stockActual ?? 0),
+        stockMinimo: Number(material.stockMinimo ?? 10),
+        costoUnitario: Number(material.costoUnitario ?? 0),
+        moneda: material.moneda || 'MXN',
+        notas: (material as any).notas || '',
       });
     } catch (err: any) {
       setError(err?.message || 'Error al cargar el material');

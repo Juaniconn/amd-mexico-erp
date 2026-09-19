@@ -81,14 +81,14 @@ export default function CompraDetailPage() {
     try {
       setLoading(true);
       setError('');
-      const res = await get<{ data: OrdenCompra }>(`/api/ordenes-compra/${id}`);
-      setCompra(res.data);
+      const compra = await get<OrdenCompra>(`/api/ordenes-compra/${id}`);
+      setCompra(compra);
       setForm({
-        moneda: res.data.moneda || 'MXN',
-        fechaEntrega: res.data.fechaEntrega || '',
-        condicionesPago: res.data.condicionesPago || '',
-        notas: res.data.notas || '',
-        estatus: res.data.estatus || 'pendiente',
+        moneda: compra.moneda || 'MXN',
+        fechaEntrega: compra.fechaEntrega || '',
+        condicionesPago: compra.condicionesPago || '',
+        notas: compra.notas || '',
+        estatus: compra.estatus || 'pendiente',
       });
     } catch (err: any) {
       setError(err?.message || 'Error al cargar la orden de compra');
