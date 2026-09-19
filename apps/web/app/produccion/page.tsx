@@ -3,34 +3,23 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  TableContainer,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
 import {
   Search,
   Plus,
   Eye,
   X,
   ClipboardList,
-  Clock,
   Loader2,
   CheckCircle2,
   AlertCircle,
   Inbox,
   CalendarDays,
   Timer,
-  ArrowRightLeft,
+  FileText,
 } from 'lucide-react';
-import { get, post, OrdenTrabajo, ApiError } from '@/lib/api';
+import { get, post, OrdenTrabajo } from '@/lib/api';
 
 const ESTATUS_OPTIONS = [
   { value: 'PENDIENTE', label: 'Pendiente' },
@@ -78,6 +67,24 @@ function getEstatusBadgeVariant(estatus: string): 'warning' | 'default' | 'succe
 
 function getEstatusLabel(estatus: string) {
   return ESTATUS_OPTIONS.find((x) => x.value === estatus)?.label || estatus;
+}
+
+function getPrioridadBadgeVariant(prioridad: string): 'destructive' | 'warning' | 'secondary' {
+  switch (prioridad) {
+    case 'ALTA': return 'destructive';
+    case 'MEDIA': return 'warning';
+    case 'BAJA': return 'secondary';
+    default: return 'secondary';
+  }
+}
+
+function getPrioridadLabel(prioridad: string) {
+  switch (prioridad) {
+    case 'ALTA': return 'Alta';
+    case 'MEDIA': return 'Media';
+    case 'BAJA': return 'Baja';
+    default: return prioridad;
+  }
 }
 
 export default function ProduccionPage() {
@@ -260,41 +267,39 @@ function ProduccionContent() {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="card-premium p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar por folio o cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="input-base pl-9"
-            />
-          </div>
-          <select
-            value={estatusFilter}
-            onChange={(e) => handleEstatusChange(e.target.value)}
-            className="input-base sm:w-48"
-          >
-            <option value="">Todos los estatus</option>
-            {ESTATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSearch}
-            className="gap-2"
-          >
-            <Search className="h-3.5 w-3.5" />
-            Buscar
-          </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar por folio o cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="input-base pl-10"
+          />
         </div>
+        <select
+          value={estatusFilter}
+          onChange={(e) => handleEstatusChange(e.target.value)}
+          className="input-base sm:w-48"
+        >
+          <option value="">Todos los estatus</option>
+          {ESTATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSearch}
+          className="gap-2"
+        >
+          <Search className="h-3.5 w-3.5" />
+          Buscar
+        </Button>
       </div>
 
       {/* Error State */}
@@ -305,104 +310,115 @@ function ProduccionContent() {
         </div>
       )}
 
-      {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Folio</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Fecha Entrega</TableHead>
-              <TableHead>Estatus</TableHead>
-              <TableHead>Tiempo Est.</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableSkeletonRows />
-            ) : ordenes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6}>
-                  <EmptyState />
-                </TableCell>
-              </TableRow>
-            ) : (
-              ordenes.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-medium">
+      {/* Client Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : ordenes.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {ordenes.map((o) => (
+            <div
+              key={o.id}
+              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+            >
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                    o.estatus === 'COMPLETADA' ? 'bg-success/10 text-success' :
+                    o.estatus === 'CANCELADA' ? 'bg-muted text-muted-foreground' :
+                    'bg-brand/10 text-brand'
+                  }`}>
+                    <ClipboardList className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
                     <button
                       onClick={() => router.push(`/produccion/ot/${o.id}`)}
-                      className="text-primary hover:underline focus:outline-none"
+                      className="block truncate text-sm font-semibold text-foreground hover:text-primary focus:outline-none"
                     >
                       {o.folio}
                     </button>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {o.cotizacion?.cliente?.razonSocial || '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(o.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getEstatusBadgeVariant(o.estatus)}>
-                      {getEstatusLabel(o.estatus)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {o._count?.partes || 0} partes
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => router.push(`/produccion/ot/${o.id}`)}
-                        title="Ver detalle"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {o.cotizacion?.cliente?.razonSocial || '—'}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant={getEstatusBadgeVariant(o.estatus)}>
+                  {getEstatusLabel(o.estatus)}
+                </Badge>
+              </div>
 
-        {/* Pagination Footer */}
-        {meta && !loading && ordenes.length > 0 && (
-          <div className="flex flex-col gap-3 border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Mostrando {ordenes.length} de {meta.total} órdenes
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Anterior
-              </Button>
-              <span className="flex items-center px-2">
-                Página {meta.page} de {meta.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-              >
-                Siguiente
-              </Button>
+              {/* Card Body */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">Prioridad:</span>
+                  <Badge variant={getPrioridadBadgeVariant(o.prioridad)} className="text-xs">
+                    {getPrioridadLabel(o.prioridad)}
+                  </Badge>
+                </div>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                  <span>{formatDate(o.createdAt)}</span>
+                </p>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                  <span>{o._count?.partes ?? 0} partes</span>
+                </p>
+                {o.notas && (
+                  <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <span className="shrink-0">📝</span>
+                    <span className="line-clamp-2">{o.notas}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Card Footer */}
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3" />
+                    OT
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" />
+                    {formatDate(o.createdAt)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => router.push(`/produccion/ot/${o.id}`)}
+                    title="Ver detalle"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-      </TableContainer>
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
-      <footer className="border-t pt-4 text-center">
+      <footer className="border-t border-border pt-4 text-center">
         <p className="text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} AMD México Operations ERP &middot; v{VERSION}
         </p>
@@ -552,74 +568,6 @@ function ProduccionContent() {
         </div>
       )}
     </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  variant = 'default',
-}: {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning' | 'brand';
-}) {
-  const variantClass =
-    variant === 'success'
-      ? 'bg-success-muted text-success'
-      : variant === 'destructive'
-      ? 'bg-danger-muted text-danger'
-      : variant === 'warning'
-      ? 'bg-warning-muted text-warning'
-      : variant === 'brand'
-      ? 'bg-brand-muted text-brand'
-      : 'bg-primary/10 text-primary';
-
-  return (
-    <div className="card-premium p-5 transition-all duration-200 hover:shadow-lg">
-      <div className="flex items-center gap-4">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${variantClass}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="section-title">{title}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TableSkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-5 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="flex justify-end gap-1">
-              <div className="h-6 w-6 animate-pulse rounded bg-muted" />
-            </div>
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
   );
 }
 

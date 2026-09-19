@@ -6,17 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  TableContainer,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
-import {
   Search,
   Plus,
+  Eye,
   Pencil,
   Trash2,
   X,
@@ -28,6 +20,11 @@ import {
   Inbox,
   ListChecks,
   Percent,
+  Calendar,
+  FileText,
+  Loader2,
+  ShieldAlert,
+  User,
 } from 'lucide-react';
 import { get, post, put, del } from '@/lib/api';
 
@@ -113,6 +110,45 @@ function formatDate(dateStr: string) {
     year: 'numeric',
   });
 }
+
+const VERSION = '0.1.0';
+
+// ─── Inline OKLCH Design Components ────────────────────
+
+function LoadingInline() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <span className="ml-2 text-sm text-muted-foreground">Cargando...</span>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-danger/20 bg-danger-muted px-6 py-12 text-center">
+      <ShieldAlert className="mb-3 h-10 w-10 text-danger" />
+      <p className="text-sm font-medium text-danger">{message}</p>
+      {onRetry && (
+        <Button variant="outline" size="sm" onClick={onRetry} className="mt-4">
+          Reintentar
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ message = 'No hay registros de calidad', submessage = 'Agregue un nuevo registro para comenzar' }: { message?: string; submessage?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
+      <p className="text-sm font-medium text-muted-foreground">{message}</p>
+      <p className="mt-1 text-xs text-muted-foreground/70">{submessage}</p>
+    </div>
+  );
+}
+
+// ─── Page Component ────────────────────────────────────
 
 export default function CalidadPage() {
   return (
@@ -272,10 +308,9 @@ function CalidadContent() {
 
   function getOperacionLabel(item: CalidadItem) {
     if (item.operacion) {
-      const nombre = item.operacion.proceso || item.operacion.nombre || 'Sin nombre';
-      return <span className="font-medium">{nombre}</span>;
+      return item.operacion.proceso || item.operacion.nombre || 'Sin nombre';
     }
-    return <span className="text-muted-foreground">Sin operación</span>;
+    return 'Sin operación';
   }
 
   function getInspectorName(item: CalidadItem) {
@@ -283,6 +318,16 @@ function CalidadContent() {
       return `${item.inspector.nombre} ${item.inspector.apellido}`;
     }
     return '—';
+  }
+
+  function getCardTitle(item: CalidadItem) {
+    if (item.ordenTrabajoId) {
+      return item.ordenTrabajoId;
+    }
+    if (item.operacion) {
+      return item.operacion.proceso || item.operacion.nombre || 'Sin nombre';
+    }
+    return item.id.slice(0, 8);
   }
 
   // Stats calculations
@@ -296,7 +341,7 @@ function CalidadContent() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Control de Calidad</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Control de Calidad</h1>
           <p className="text-sm text-muted-foreground">
             Gestión de inspecciones y resultados
           </p>
@@ -308,199 +353,265 @@ function CalidadContent() {
       </div>
 
       {/* Success Message */}
-      {success && (
+      {success && !showModal && (
         <div className="flex items-center gap-3 rounded-xl border border-success/20 bg-success-muted px-4 py-3 text-sm text-success">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
           <span>{success}</span>
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Stats Cards with borders */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Inspecciones"
-          value={totalControles}
-          icon={<ListChecks className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Aprobadas"
-          value={aprobados}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          variant="success"
-        />
-        <StatCard
-          title="Rechazadas"
-          value={rechazados}
-          icon={<XCircle className="h-4 w-4" />}
-          variant="destructive"
-        />
-        <StatCard
-          title="Tasa Aprobación"
-          value={`${tasaAprobacion}%`}
-          icon={<Percent className="h-4 w-4" />}
-          variant="brand"
-        />
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <ListChecks className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total Inspecciones</p>
+              <p className="text-2xl font-bold tracking-tight">{totalControles}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Aprobadas</p>
+              <p className="text-2xl font-bold tracking-tight">{aprobados}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <XCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Rechazadas</p>
+              <p className="text-2xl font-bold tracking-tight">{rechazados}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <Percent className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Tasa Aprobación</p>
+              <p className="text-2xl font-bold tracking-tight">{tasaAprobacion}%</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="card-premium p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar por observaciones o producto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="input-base pl-9"
-            />
-          </div>
-          <select
-            value={resultadoFilter}
-            onChange={(e) => handleResultadoChange(e.target.value)}
-            className="input-base sm:w-48"
-          >
-            <option value="">Todos los resultados</option>
-            {RESULTADOS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={tipoFilter}
-            onChange={(e) => setTipoFilter(e.target.value)}
-            className="input-base sm:w-48"
-          >
-            <option value="">Todos los tipos</option>
-            {TIPOS.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSearch}
-            className="gap-2"
-          >
-            <Search className="h-3.5 w-3.5" />
-            Buscar
-          </Button>
+      {/* Search/Filter Bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar por observaciones o producto..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="input-base pl-10"
+          />
         </div>
+        <select
+          value={resultadoFilter}
+          onChange={(e) => handleResultadoChange(e.target.value)}
+          className="input-base sm:w-48"
+        >
+          <option value="">Todos los resultados</option>
+          {RESULTADOS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={tipoFilter}
+          onChange={(e) => setTipoFilter(e.target.value)}
+          className="input-base sm:w-48"
+        >
+          <option value="">Todos los tipos</option>
+          {TIPOS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <Button variant="outline" size="sm" onClick={handleSearch} className="gap-2">
+          <Search className="h-3.5 w-3.5" />
+          Buscar
+        </Button>
       </div>
 
       {/* Error State */}
-      {error && (
-        <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span>{error}</span>
+      {error && !showModal && (
+        <ErrorState message={error} onRetry={() => loadData(page, search, resultadoFilter)} />
+      )}
+
+      {/* Quality Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+            >
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                    item.resultado === 'aprobado' ? 'bg-success/10 text-success' :
+                    item.resultado === 'rechazado' ? 'bg-destructive/10 text-destructive' :
+                    item.resultado === 'rework' ? 'bg-warning/10 text-warning' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    <ClipboardCheck className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-foreground">{getCardTitle(item)}</h3>
+                    <p className="text-xs text-muted-foreground">{item.id.slice(0, 8)}</p>
+                  </div>
+                </div>
+                <Badge variant={getResultadoBadgeVariant(item.resultado)}>
+                  {getResultadoLabel(item.resultado)}
+                </Badge>
+              </div>
+
+              {/* Card Body */}
+              <div className="mt-4 space-y-2">
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <User className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{getInspectorName(item)}</span>
+                </p>
+                {item.defectos && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.defectos}</span>
+                  </p>
+                )}
+                {item.observaciones && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.observaciones}</span>
+                  </p>
+                )}
+                {item.operacion && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <ListChecks className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.operacion.proceso || item.operacion.nombre || 'Operación'}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Card Footer */}
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(item.createdAt)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(item)}
+                    title="Ver registro"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(item)}
+                    title="Editar registro"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleDelete(item.id)}
+                    title="Eliminar registro"
+                    className="text-danger hover:text-danger"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Folio</TableHead>
-              <TableHead>Producto</TableHead>
-              <TableHead>Inspector</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Resultado</TableHead>
-              <TableHead>Observaciones</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableSkeletonRows />
-            ) : items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7}>
-                  <EmptyState />
-                </TableCell>
-              </TableRow>
-            ) : (
-              items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    <span className="text-primary">{item.id.slice(0, 8)}</span>
-                  </TableCell>
-                  <TableCell>{getOperacionLabel(item)}</TableCell>
-                  <TableCell className="text-muted-foreground">{getInspectorName(item)}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(item.createdAt)}</TableCell>
-                  <TableCell>
-                    <Badge variant={getResultadoBadgeVariant(item.resultado)}>
-                      {getResultadoLabel(item.resultado)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground">
-                    {item.observaciones || item.defectos || '—'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(item)}
-                        title="Editar registro"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDelete(item.id)}
-                        title="Eliminar registro"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Pagination Footer */}
-        {meta && !loading && items.length > 0 && (
-          <div className="flex flex-col gap-3 border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Mostrando {items.length} de {meta.total} registros
+      {/* Pagination Footer */}
+      {meta && !loading && items.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Mostrando {items.length} de {meta.total} registros
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              Anterior
+            </Button>
+            <span className="flex items-center px-2">
+              Página {meta.page} de {meta.totalPages}
             </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Anterior
-              </Button>
-              <span className="flex items-center px-2">
-                Página {meta.page} de {meta.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-              >
-                Siguiente
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+              disabled={page >= meta.totalPages}
+            >
+              Siguiente
+            </Button>
           </div>
-        )}
-      </TableContainer>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="border-t border-border pt-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} AMD México Operations ERP · v{VERSION}
+        </p>
+      </footer>
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex-row items-center justify-between space-y-0 border-b pb-4">
               <CardTitle>
@@ -617,92 +728,6 @@ function CalidadContent() {
           </Card>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  variant = 'default',
-}: {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning' | 'brand';
-}) {
-  const variantClass =
-    variant === 'success'
-      ? 'bg-success-muted text-success'
-      : variant === 'destructive'
-      ? 'bg-danger-muted text-danger'
-      : variant === 'warning'
-      ? 'bg-warning-muted text-warning'
-      : variant === 'brand'
-      ? 'bg-brand-muted text-brand'
-      : 'bg-primary/10 text-primary';
-
-  return (
-    <div className="card-premium p-5 transition-all duration-200 hover:shadow-lg">
-      <div className="flex items-center gap-4">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${variantClass}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="section-title">{title}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TableSkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-5 w-16 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="flex justify-end gap-1">
-              <div className="h-6 w-6 animate-pulse rounded bg-muted" />
-              <div className="h-6 w-6 animate-pulse rounded bg-muted" />
-            </div>
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
-      <p className="text-sm font-medium text-muted-foreground">
-        No hay registros de calidad
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground/70">
-        Agregue un nuevo registro para comenzar
-      </p>
     </div>
   );
 }

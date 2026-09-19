@@ -20,8 +20,7 @@ import {
   Loader2,
   AlertCircle,
   Inbox,
-  Edit3,
-  Trash2,
+  Eye,
   X,
 } from 'lucide-react';
 import { get, post, ApiError } from '@/lib/api';
@@ -320,117 +319,140 @@ function ComprasContent() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="card-premium overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-separate border-spacing-0">
-            <thead>
-              <tr className="bg-muted/30">
-                <th className="border-b border-border px-4 py-3 text-left text-section-title">
-                  Fecha
-                </th>
-                <th className="border-b border-border px-4 py-3 text-left text-section-title">
-                  Folio
-                </th>
-                <th className="border-b border-border px-4 py-3 text-left text-section-title">
-                  Proveedor
-                </th>
-                <th className="border-b border-border px-4 py-3 text-right text-section-title">
-                  Productos
-                </th>
-                <th className="border-b border-border px-4 py-3 text-right text-section-title">
-                  Total
-                </th>
-                <th className="border-b border-border px-4 py-3 text-left text-section-title">
-                  Estatus
-                </th>
-              </tr>
-            </thead>
-            <tbody className="text-table">
-              {loading ? (
-                <LoadingRows />
-              ) : ordenes.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12">
-                    <EmptyState
-                      message="No hay órdenes de compra registradas"
-                      description="Las órdenes de compra aparecerán aquí cuando se creen"
-                    />
-                  </td>
-                </tr>
-              ) : (
-                ordenes.map((o, idx) => (
-                  <tr
-                    key={o.id}
-                    className={`transition-colors hover:bg-muted/20 ${
-                      idx !== ordenes.length - 1 ? 'border-b border-border' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-3 text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {new Date(o.createdAt).toLocaleDateString('es-MX')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      <button
-                        onClick={() => router.push(`/compras/${o.id}`)}
-                        className="flex items-center gap-2 text-primary hover:underline focus:outline-none"
-                      >
-                        <FileText className="h-3.5 w-3.5 text-brand" />
-                        {o.folio}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      {o.proveedores?.[0]?.proveedorNombre || o.razonSocial || o.clienteId}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="inline-flex items-center gap-1">
-                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                        {getProductosCount(o)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-foreground">
-                      {o.moneda === 'USD' ? '$' : '$'}
-                      {Number(o.total).toLocaleString('es-MX', {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge estatus={o.estatus} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Footer */}
-        {meta && !loading && ordenes.length > 0 && (
-          <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            <span>
-              Mostrando {ordenes.length} de {meta.total} órdenes
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="btn-outline px-3 py-1.5 text-xs disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-                className="btn-outline px-3 py-1.5 text-xs disabled:opacity-50"
-              >
-                Siguiente
-              </button>
+      {/* Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
             </div>
+          ))}
+        </div>
+      ) : ordenes.length === 0 ? (
+        <EmptyState
+          message="No hay órdenes de compra registradas"
+          description="Las órdenes de compra aparecerán aquí cuando se creen"
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {ordenes.map((o) => (
+            <div
+              key={o.id}
+              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+            >
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                    o.estatus.toLowerCase() === 'aprobada' || o.estatus.toLowerCase() === 'completada'
+                      ? 'bg-success/10 text-success'
+                      : o.estatus.toLowerCase() === 'cancelada' || o.estatus.toLowerCase() === 'rechazada'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-brand/10 text-brand'
+                  }`}>
+                    <ShoppingCart className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <button
+                      onClick={() => router.push(`/compras/${o.id}`)}
+                      className="truncate text-sm font-semibold text-foreground hover:text-primary hover:underline focus:outline-none"
+                    >
+                      {o.folio}
+                    </button>
+                    <p className="text-xs text-muted-foreground truncate">{o.razonSocial || o.clienteId}</p>
+                  </div>
+                </div>
+                <StatusBadge estatus={o.estatus} />
+              </div>
+
+              {/* Card Body */}
+              <div className="mt-4 space-y-2">
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Package className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{o.proveedores?.[0]?.proveedorNombre || 'Sin proveedor'}</span>
+                </p>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <DollarSign className="h-3.5 w-3.5 shrink-0" />
+                  <span className="font-semibold text-foreground">
+                    {o.moneda === 'USD' ? '$' : '$'}
+                    {Number(o.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-muted-foreground/70">{o.moneda}</span>
+                </p>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  <span>{new Date(o.fecha).toLocaleDateString('es-MX')}</span>
+                </p>
+                {o.notas && (
+                  <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{o.notas}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Card Footer */}
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    {getProductosCount(o)} prod.
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(o.createdAt).toLocaleDateString('es-MX')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => router.push(`/compras/${o.id}`)}
+                    title="Ver orden"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {meta && !loading && ordenes.length > 0 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
+          <span>
+            Mostrando {ordenes.length} de {meta.total} órdenes
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-outline px-3 py-1.5 text-xs disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+              disabled={page >= meta.totalPages}
+              className="btn-outline px-3 py-1.5 text-xs disabled:opacity-50"
+            >
+              Siguiente
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* New Compra Modal */}
       {showModal && (
@@ -623,47 +645,6 @@ function ComprasContent() {
   );
 }
 
-// ─── Stat Card ──────────────────────────────────────────────
-
-function StatCard({
-  icon,
-  label,
-  value,
-  color,
-  isCurrency = false,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  color: 'brand' | 'warning' | 'success' | 'danger';
-  isCurrency?: boolean;
-}) {
-  const colorMap = {
-    brand: 'text-brand bg-brand-muted',
-    warning: 'text-warning bg-warning-muted',
-    success: 'text-success bg-success-muted',
-    danger: 'text-danger bg-danger-muted',
-  };
-
-  return (
-    <div className="card-premium p-5">
-      <div className="flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="section-title">{label}</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-            {isCurrency
-              ? `$ ${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
-              : value}
-          </p>
-        </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colorMap[color]}`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Status Badge ───────────────────────────────────────────
 
 function StatusBadge({ estatus }: { estatus: string }) {
@@ -698,42 +679,11 @@ function StatusBadge({ estatus }: { estatus: string }) {
   );
 }
 
-// ─── Loading Rows ───────────────────────────────────────────
-
-function LoadingRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-b border-border">
-          <td className="px-4 py-3">
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </td>
-          <td className="px-4 py-3">
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-          </td>
-          <td className="px-4 py-3">
-            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-          </td>
-          <td className="px-4 py-3">
-            <div className="h-4 w-8 animate-pulse rounded bg-muted" />
-          </td>
-          <td className="px-4 py-3">
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </td>
-          <td className="px-4 py-3">
-            <div className="h-5 w-20 animate-pulse rounded bg-muted" />
-          </td>
-        </tr>
-      ))}
-    </>
-  );
-}
-
 // ─── Empty State ────────────────────────────────────────────
 
 function EmptyState({ message, description }: { message: string; description?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center">
+    <div className="flex flex-col items-center justify-center py-12 text-center">
       <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
       <p className="text-sm font-medium text-muted-foreground">{message}</p>
       {description && (

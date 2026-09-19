@@ -158,31 +158,31 @@ function DashboardContent() {
         </button>
       </div>
 
-      {/* KPI Grid — compact card grid with borders */}
+      {/* KPI Grid — card grid matching Clientes pattern */}
       <div>
         <h2 className="section-title mb-3">Métricas Principales</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {statCards.map((stat) => (
             <div
               key={stat.key}
-              className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {stat.title}
-                </span>
-                <div className={`rounded-lg p-1.5 ${
+                <div className="min-w-0 flex-1">
+                  <p className="section-title truncate">{stat.title}</p>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+                    {stats[stat.key]}
+                  </p>
+                </div>
+                <div className={`ml-3 shrink-0 rounded-lg p-2 ${
                   stat.variant === 'brand' ? 'bg-brand/10 text-brand' :
                   stat.variant === 'success' ? 'bg-success/10 text-success' :
                   stat.variant === 'warning' ? 'bg-warning/10 text-warning' :
                   'bg-muted text-muted-foreground'
                 }`}>
-                  <stat.icon className="h-4 w-4" />
+                  <stat.icon className="h-5 w-5" />
                 </div>
               </div>
-              <span className="text-2xl font-bold tracking-tight text-foreground">
-                {stats[stat.key]}
-              </span>
             </div>
           ))}
         </div>

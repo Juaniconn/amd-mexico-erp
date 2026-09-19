@@ -3,18 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  TableContainer,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
 import {
   Search,
   Plus,
@@ -29,8 +19,10 @@ import {
   Activity,
   Tags,
   X,
+  Eye,
+  Calendar,
 } from 'lucide-react';
-import { get, post, ApiError } from '@/lib/api';
+import { get, post } from '@/lib/api';
 import type { Material } from '@/types';
 
 interface MaterialFormData {
@@ -284,101 +276,158 @@ function InventarioContent() {
       </div>
 
       {/* Error State */}
-      {error && (
+      {error && !showModal && (
         <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>Unidad</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="text-right">Precio Unitario</TableHead>
-              <TableHead>Estatus</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableSkeletonRows />
-            ) : items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6}>
-                  <EmptyState
-                    icon={<Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />}
-                    title="No hay materiales registrados"
-                    description="Agregue un nuevo material para comenzar"
-                  />
-                </TableCell>
-              </TableRow>
-            ) : (
-              items.map((m) => {
-                const status = getStockStatus(Number(m.stockActual ?? 0), Number(m.stockMinimo ?? 10));
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell className="font-medium">
+      {/* Material Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
+          <p className="text-sm font-medium text-muted-foreground">No hay materiales registrados</p>
+          <p className="mt-1 text-xs text-muted-foreground/70">Agregue un nuevo material para comenzar</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((m) => {
+            const status = getStockStatus(Number(m.stockActual ?? 0), Number(m.stockMinimo ?? 10));
+            return (
+              <div
+                key={m.id}
+                className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                      (m.stockActual ?? 0) === 0
+                        ? 'bg-destructive/10 text-destructive'
+                        : (m.stockActual ?? 0) <= (m.stockMinimo || 10)
+                        ? 'bg-warning/10 text-warning'
+                        : 'bg-brand/10 text-brand'
+                    }`}>
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-foreground">{m.descripcion}</h3>
                       <button
                         onClick={() => router.push(`/inventario/${m.id}`)}
-                        className="flex items-center gap-1.5 text-primary hover:underline focus:outline-none"
+                        className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none"
                       >
-                        <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Hash className="h-3 w-3 text-muted-foreground" />
                         {m.codigo}
                       </button>
-                    </TableCell>
-                    <TableCell className="text-table">{m.descripcion}</TableCell>
-                    <TableCell className="text-table text-muted-foreground">{m.unidad}</TableCell>
-                    <TableCell className="text-right font-semibold text-table">
-                      {Number(m.stockActual ?? 0).toLocaleString('es-MX')}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-table">
-                      {formatCurrency(m.costoUnitario ?? 0)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={status.variant}>
-                        <status.icon className="mr-1 h-3 w-3" />
-                        {status.label}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                    </div>
+                  </div>
+                  <Badge variant={status.variant}>
+                    <status.icon className="mr-1 h-3 w-3" />
+                    {status.label}
+                  </Badge>
+                </div>
 
-        {/* Pagination Footer */}
-        {meta && !loading && items.length > 0 && (
-          <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
-            <span>
-              Mostrando {items.length} de {meta.total} productos
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-              >
-                Siguiente
-              </Button>
-            </div>
+                {/* Card Body */}
+                <div className="mt-4 space-y-2">
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Layers className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium">Tipo:</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{m.tipo}</Badge>
+                  </p>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Hash className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium">Unidad:</span>
+                    <span>{m.unidad}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Activity className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium">Stock:</span>
+                    <span className="font-semibold text-foreground">{Number(m.stockActual ?? 0).toLocaleString('es-MX')}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <DollarSign className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium">Costo Unitario:</span>
+                    <span>{formatCurrency(m.costoUnitario ?? 0)}</span>
+                  </p>
+                </div>
+
+                {/* Card Footer */}
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {new Date(m.createdAt).toLocaleDateString('es-MX')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => router.push(`/inventario/${m.id}`)}
+                      title="Ver material"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {meta && !loading && items.length > 0 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
+          <span>
+            Mostrando {items.length} de {meta.total} productos
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+              disabled={page >= meta.totalPages}
+            >
+              Siguiente
+            </Button>
           </div>
-        )}
-      </TableContainer>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="border-t border-border pt-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} AMD México Operations ERP
+        </p>
+      </footer>
 
       {/* New Material Modal */}
       {showModal && (
@@ -541,97 +590,6 @@ function InventarioContent() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  variant = 'default',
-  description,
-}: {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning';
-  description?: string;
-}) {
-  return (
-    <Card className="card-premium transition-all duration-200 hover:shadow-lg">
-      <CardContent className="flex items-center gap-4 p-4">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            variant === 'success'
-              ? 'bg-success-muted text-success'
-              : variant === 'destructive'
-              ? 'bg-destructive/10 text-destructive'
-              : variant === 'warning'
-              ? 'bg-warning-muted text-warning'
-              : 'bg-primary/10 text-primary'
-          }`}
-        >
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="section-title">{title}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-          {description && (
-            <p className="mt-0.5 text-xs text-muted-foreground truncate">{description}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TableSkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <div className="flex items-center gap-1.5">
-              <Hash className="h-3.5 w-3.5 animate-pulse bg-muted" />
-              <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-            </div>
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-12 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="ml-auto h-4 w-10 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      {icon}
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground/70">{description}</p>
     </div>
   );
 }

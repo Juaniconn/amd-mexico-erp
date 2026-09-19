@@ -392,157 +392,168 @@ export default function UsuariosPage() {
           placeholder="Buscar por nombre, email o usuario..."
         />
 
-        {/* Stats Row */}
+        {/* Stats Row — card grid matching Clientes pattern */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {/* Total */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Users className="h-5 w-5 text-primary" />
+          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="section-title">Total</p>
+                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{totalUsuarios}</p>
               </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold text-foreground">{totalUsuarios}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Activos */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <UserCheck className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Activos</p>
-                <p className="text-2xl font-bold text-foreground">{activos}</p>
+              <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
+                <Users className="h-5 w-5" />
               </div>
             </div>
           </div>
-
-          {/* Admins */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10">
-                <Shield className="h-5 w-5 text-brand" />
+          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="section-title">Activos</p>
+                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{activos}</p>
               </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Admins</p>
-                <p className="text-2xl font-bold text-foreground">{admins}</p>
+              <div className="ml-3 shrink-0 rounded-lg p-2 bg-success/10 text-success">
+                <UserCheck className="h-5 w-5" />
               </div>
             </div>
           </div>
-
-          {/* Inactivos */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger/10">
-                <UserX className="h-5 w-5 text-danger" />
+          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="section-title">Admins</p>
+                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{admins}</p>
               </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Inactivos</p>
-                <p className="text-2xl font-bold text-foreground">{inactivos}</p>
+              <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
+                <Shield className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="section-title">Inactivos</p>
+                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{inactivos}</p>
+              </div>
+              <div className="ml-3 shrink-0 rounded-lg p-2 bg-destructive/10 text-destructive">
+                <UserX className="h-5 w-5" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Table */}
-        <TableContainer>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Último Acceso</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <LoadingInline />
-                  </TableCell>
-                </TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <EmptyState />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map(user => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <p className="font-medium text-foreground">{user.nombre} {user.apellido}</p>
-                      <p className="text-xs text-muted-foreground">@{user.username}</p>
-                    </TableCell>
-                    <TableCell className="text-sm text-foreground">{user.email}</TableCell>
-                    <TableCell><RoleBadge role={user.role} /></TableCell>
-                    <TableCell><StatusBadge active={user.activo} /></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDate(user.ultimoAcceso)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title="Editar"
-                          onClick={() => startEdit(user)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title={user.activo ? 'Desactivar' : 'Activar'}
-                          onClick={() => requestToggleActive(user)}
-                          className={user.activo ? 'text-warning hover:text-warning' : 'text-success hover:text-success'}
-                        >
-                          <Shield className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-
-          {/* Pagination Footer */}
-          {meta && !loading && usuarios.length > 0 && (
-            <div className="flex items-center justify-between border-t border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
-              <span>
-                Mostrando {usuarios.length} de {meta.total} usuarios
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadUsuarios(meta.page - 1, search, filterRole)}
-                  disabled={meta.page <= 1}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadUsuarios(meta.page + 1, search, filterRole)}
-                  disabled={meta.page >= meta.totalPages}
-                >
-                  Siguiente
-                </Button>
+        {/* User Cards Grid — matching Clientes pattern */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-muted" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 rounded bg-muted" />
+                    <div className="h-3 w-1/2 rounded bg-muted" />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-3 w-2/3 rounded bg-muted" />
+                </div>
               </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map(user => (
+              <div
+                key={user.id}
+                className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                      user.activo ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      <span className="text-sm font-bold">
+                        {user.nombre?.[0]}{user.apellido?.[0]}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-foreground">
+                        {user.nombre} {user.apellido}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">@{user.username}</p>
+                    </div>
+                  </div>
+                  <StatusBadge active={user.activo} />
+                </div>
+
+                {/* Card Body */}
+                <div className="mt-4 space-y-2">
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Users className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{user.email}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <RoleBadge role={user.role} />
+                  </div>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <span>Último acceso: {formatDate(user.ultimoAcceso)}</span>
+                  </p>
+                </div>
+
+                {/* Card Footer */}
+                <div className="mt-4 flex items-center justify-end gap-1 border-t border-border pt-3">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Editar"
+                    onClick={() => startEdit(user)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title={user.activo ? 'Desactivar' : 'Activar'}
+                    onClick={() => requestToggleActive(user)}
+                    className={user.activo ? 'text-warning hover:text-warning' : 'text-success hover:text-success'}
+                  >
+                    {user.activo ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination Footer */}
+        {meta && !loading && filtered.length > 0 && (
+          <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
+            <span>
+              Mostrando {filtered.length} de {meta.total} usuarios
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadUsuarios(meta.page - 1, search, filterRole)}
+                disabled={meta.page <= 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadUsuarios(meta.page + 1, search, filterRole)}
+                disabled={meta.page >= meta.totalPages}
+              >
+                Siguiente
+              </Button>
             </div>
-          )}
-        </TableContainer>
+          </div>
+        )}
 
         {/* Modal Form */}
         {showForm && (

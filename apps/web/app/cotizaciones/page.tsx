@@ -2,20 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  TableContainer,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
 import {
   Search,
   Plus,
@@ -32,8 +21,10 @@ import {
   DollarSign,
   Eye,
   X,
+  Calendar,
+  Loader2,
 } from 'lucide-react';
-import { get, put, del, post, ApiError } from '@/lib/api';
+import { get, put, del, post } from '@/lib/api';
 import type { Cotizacion } from '@/types';
 
 interface CotizacionFormData {
@@ -260,35 +251,52 @@ function CotizacionesContent() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards with borders */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total"
-          value={totalCotizaciones}
-          icon={<FileText className="h-4 w-4" />}
-          description="Cotizaciones registradas"
-        />
-        <StatCard
-          title="Pendientes"
-          value={pendientes}
-          icon={<Clock className="h-4 w-4" />}
-          variant="warning"
-          description="Borrador / En revisión"
-        />
-        <StatCard
-          title="Aceptadas"
-          value={aceptadas}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          variant="success"
-          description="Aprobadas / Convertidas"
-        />
-        <StatCard
-          title="Rechazadas"
-          value={rechazadas}
-          icon={<XCircle className="h-4 w-4" />}
-          variant="destructive"
-          description="Rechazadas / Canceladas"
-        />
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total</p>
+              <p className="text-2xl font-bold tracking-tight">{totalCotizaciones}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Pendientes</p>
+              <p className="text-2xl font-bold tracking-tight">{pendientes}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Aceptadas</p>
+              <p className="text-2xl font-bold tracking-tight">{aceptadas}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <XCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Rechazadas</p>
+              <p className="text-2xl font-bold tracking-tight">{rechazadas}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -334,129 +342,153 @@ function CotizacionesContent() {
         </div>
       )}
 
-      {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Folio</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead>Estatus</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableSkeletonRows />
-            ) : cotizaciones.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6}>
-                  <EmptyState
-                    icon={<Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />}
-                    title="No hay cotizaciones registradas"
-                    description="Cree una nueva cotización para comenzar"
-                  />
-                </TableCell>
-              </TableRow>
-            ) : (
-              cotizaciones.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    <button
-                      onClick={() => router.push(`/cotizaciones/${c.id}`)}
-                      className="text-primary hover:underline font-medium flex items-center gap-1.5"
-                    >
-                      <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                      {c.folio}
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-table">{c.razonSocial || '—'}</TableCell>
-                  <TableCell className="text-table text-muted-foreground">
-                    {formatDate(c.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-table">
-                    {formatCurrency(c.total, c.moneda)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANTS[c.estatus] || 'secondary'}>
-                      {STATUS_LABELS[c.estatus] || c.estatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => router.push(`/cotizaciones/${c.id}`)}
-                        title="Ver detalle"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => router.push(`/cotizaciones/${c.id}/edit`)}
-                        title="Editar cotización"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      {(c.estatus === 'BORRADOR' || c.estatus === 'EN_REVISION') && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => handleSend(c.id)}
-                          title="Enviar cotización"
-                          className="text-success hover:text-success"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDelete(c.id)}
-                        title="Eliminar cotización"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Pagination Footer */}
-        {meta && !loading && cotizaciones.length > 0 && (
-          <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
-            <span>
-              Mostrando {cotizaciones.length} de {meta.total} cotizaciones
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-              >
-                Siguiente
-              </Button>
+      {/* Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
             </div>
+          ))}
+        </div>
+      ) : cotizaciones.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Inbox className="mb-3 h-10 w-10 text-muted-foreground/50" />
+          <p className="text-sm font-medium text-muted-foreground">No hay cotizaciones registradas</p>
+          <p className="mt-1 text-xs text-muted-foreground/70">Cree una nueva cotización para comenzar</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {cotizaciones.map((c) => (
+              <div
+                key={c.id}
+                className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
+                      <Hash className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => router.push(`/cotizaciones/${c.id}`)}
+                        className="truncate text-sm font-semibold text-foreground hover:text-brand transition-colors"
+                      >
+                        {c.folio}
+                      </button>
+                      <p className="text-xs text-muted-foreground truncate">{c.razonSocial || '—'}</p>
+                    </div>
+                  </div>
+                  <Badge variant={STATUS_VARIANTS[c.estatus] || 'secondary'}>
+                    {STATUS_LABELS[c.estatus] || c.estatus}
+                  </Badge>
+                </div>
+
+                {/* Card Body */}
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <DollarSign className="h-3.5 w-3.5 shrink-0 text-success" />
+                      {formatCurrency(c.total, c.moneda)}
+                    </p>
+                    <span className="text-xs text-muted-foreground">{c.moneda}</span>
+                  </div>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                    {formatDate(c.fecha)}
+                  </p>
+                  {c.notas && (
+                    <p className="text-xs text-muted-foreground/80 line-clamp-2 pt-1">
+                      {c.notas}
+                    </p>
+                  )}
+                </div>
+
+                {/* Card Footer */}
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => router.push(`/cotizaciones/${c.id}`)}
+                      title="Ver detalle"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => router.push(`/cotizaciones/${c.id}/edit`)}
+                      title="Editar cotización"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    {(c.estatus === 'BORRADOR' || c.estatus === 'EN_REVISION') && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => handleSend(c.id)}
+                        title="Enviar cotización"
+                        className="text-success hover:text-success"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDelete(c.id)}
+                      title="Eliminar cotización"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </TableContainer>
+
+          {/* Pagination Footer */}
+          {meta && !loading && cotizaciones.length > 0 && (
+            <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
+              <span>
+                Mostrando {cotizaciones.length} de {meta.total} cotizaciones
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                  disabled={page >= meta.totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* New Cotización Modal */}
       {showModal && (
@@ -652,101 +684,6 @@ function CotizacionesContent() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  variant = 'default',
-  description,
-}: {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning';
-  description?: string;
-}) {
-  return (
-    <Card className="card-premium transition-all duration-200 hover:shadow-lg">
-      <CardContent className="flex items-center gap-4 p-4">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            variant === 'success'
-              ? 'bg-success-muted text-success'
-              : variant === 'destructive'
-              ? 'bg-destructive/10 text-destructive'
-              : variant === 'warning'
-              ? 'bg-warning-muted text-warning'
-              : 'bg-primary/10 text-primary'
-          }`}
-        >
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="section-title">{title}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-          {description && (
-            <p className="mt-0.5 text-xs text-muted-foreground truncate">{description}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TableSkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell>
-            <div className="flex items-center gap-1.5">
-              <Hash className="h-3.5 w-3.5 animate-pulse bg-muted" />
-              <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-            </div>
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />
-          </TableCell>
-          <TableCell>
-            <div className="flex justify-end gap-1">
-              <div className="h-6 w-6 animate-pulse rounded bg-muted" />
-              <div className="h-6 w-6 animate-pulse rounded bg-muted" />
-              <div className="h-6 w-6 animate-pulse rounded bg-muted" />
-            </div>
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      {icon}
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground/70">{description}</p>
     </div>
   );
 }

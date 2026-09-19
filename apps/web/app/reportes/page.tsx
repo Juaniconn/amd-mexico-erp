@@ -259,50 +259,50 @@ export default function ReportesPage() {
         {/* Dashboard Content */}
         {!loading && !error && stats && (
           <>
-            {/* Financial KPIs */}
+            {/* Financial KPIs — card grid matching Clientes pattern */}
             <div>
               <h2 className="section-title mb-3">Indicadores Financieros</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {financialKPIs.map((kpi) => (
                   <div
                     key={kpi.label}
-                    className="flex items-center gap-4 border border-border bg-card rounded-xl p-4"
+                    className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
                   >
-                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${kpi.iconBg}`}>
-                      <kpi.icon className={`h-5 w-5 ${kpi.iconColor}`} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        {kpi.label}
-                      </p>
-                      <p className="truncate text-2xl font-bold text-foreground">
-                        {kpi.value}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="section-title">{kpi.label}</p>
+                        <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+                          {kpi.value}
+                        </p>
+                      </div>
+                      <div className={`ml-3 shrink-0 rounded-lg p-2 ${kpi.iconBg}`}>
+                        <kpi.icon className={`h-5 w-5 ${kpi.iconColor}`} />
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Main KPIs Grid */}
+            {/* Main KPIs Grid — card grid matching Clientes pattern */}
             <div>
               <h2 className="section-title mb-3">Métricas Generales</h2>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {generalMetrics.map((metric) => (
                   <div
                     key={metric.label}
-                    className="flex flex-col gap-3 border border-border bg-card rounded-xl p-4"
+                    className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
                   >
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${metric.iconBg}`}>
-                      <metric.icon className={`h-4 w-4 ${metric.iconColor}`} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        {metric.label}
-                      </p>
-                      <p className="text-2xl font-bold text-foreground">
-                        {metric.value}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="section-title">{metric.label}</p>
+                        <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+                          {metric.value}
+                        </p>
+                      </div>
+                      <div className={`ml-3 shrink-0 rounded-lg p-2 ${metric.iconBg}`}>
+                        <metric.icon className={`h-5 w-5 ${metric.iconColor}`} />
+                      </div>
                     </div>
                   </div>
                 ))}
