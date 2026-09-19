@@ -1,0 +1,27 @@
+schema-version: "2.0.0"
+verbose: false
+show-secrets: false
+
+allowlist:
+  - match: 'passwordHash|password_hash'
+    name: orm-mapping
+  - match: 'password\?:|password!:'
+    name: dto-field
+  - match: 'bcrypt\.hash\(|bcrypt\.compare\(|SALT_ROUNDS'
+    name: bcrypt-logic
+  - match: "localStorage\\.get\\('accessToken'\\)"
+    name: localstorage-token
+  - match: 'updatePassword|@Patch.*password'
+    name: route-handler
+  - match: 'const \{ password'
+    name: form-destructuring
+  - match: 'placeholder.*password'
+    name: ui-placeholder
+
+paths:
+  - '*.md'
+  - '.env.example'
+  - '*.spec.ts'
+  - '*.test.ts'
+  - '**/migrations/**'
+  - 'docs/**'
