@@ -11,15 +11,11 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3001
-      DATABASE_URL: postgresql://erp:${POSTGRES_PASSWORD:-erp_password}@127.0.0.1:5432/erp_db
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_pass_2026}@127.0.0.1:6379
       MINIO_ENDPOINT: 127.0.0.1
       MINIO_PORT: 9000
       MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       JWT_EXPIRES_IN: 8h
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret}
       JWT_REFRESH_EXPIRES_IN: 7d
     depends_on:
       - db
@@ -69,9 +65,11 @@ services:
     container_name: amd-erp-minio
     restart: always
     network_mode: host
+    env_file:
+      - ../../.env.docker
     environment:
       - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     command: server /data --address "127.0.0.1:9000" --console-address "127.0.0.1:9001"
     volumes:
       - docker_docker_minio_data:/data

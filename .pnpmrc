@@ -1,0 +1,4 @@
+node-linker=hoisted
+strict-dep-builds=false
+auto-install-peers=true
+allow-build=true

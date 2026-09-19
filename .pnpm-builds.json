@@ -1,0 +1,1 @@
+approved-builds=["@nestjs/core","@prisma/client","@prisma/engines","esbuild","prisma","unrs-resolver","bcryptjs","class-validator","class-transformer"]
