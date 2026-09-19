@@ -65,6 +65,11 @@ export class CreateCotizacionDto {
 
   @IsString()
   @IsOptional()
+  @IsEnum(['MXN', 'USD'])
+  moneda?: string;
+
+  @IsString()
+  @IsOptional()
   notas?: string;
 
   @IsArray()
@@ -92,6 +97,11 @@ export class UpdateCotizacionDto {
   @IsString()
   @IsOptional()
   notas?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsEnum(['MXN', 'USD'])
+  moneda?: string;
 
   @IsArray()
   @IsOptional()

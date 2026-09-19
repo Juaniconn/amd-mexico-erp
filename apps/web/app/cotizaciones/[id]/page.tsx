@@ -36,6 +36,8 @@ import {
   XCircle,
   StickyNote,
   Wrench,
+  X,
+  Plus,
 } from 'lucide-react';
 import { get, put, del, ApiError } from '@/lib/api';
 import type { CotizacionWithParts, DetalleCotizacion } from '@/types';
@@ -75,6 +77,14 @@ function formatDate(dateStr: string | undefined): string {
   });
 }
 
+interface EditForm {
+  moneda: string;
+  fechaEntrega: string;
+  notas: string;
+  estatus: string;
+  lineas: { descripcion: string; cantidad: number; unidad: string; precioUnitario: number }[];
+}
+
 export default function CotizacionDetallePage() {
   const params = useParams();
   const router = useRouter();
@@ -84,6 +94,16 @@ export default function CotizacionDetallePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [editForm, setEditForm] = useState<EditForm>({
+    moneda: 'MXN',
+    fechaEntrega: '',
+    notas: '',
+    estatus: 'BORRADOR',
+    lineas: [],
+  });
 
   const fetchCotizacion = useCallback(async () => {
     try {
@@ -134,6 +154,65 @@ export default function CotizacionDetallePage() {
   const handleConvertToOT = () => {
     router.push(`/produccion?cotizacionId=${id}`);
   };
+
+  function openEditModal() {
+    if (!cotizacion) return;
+    setEditForm({
+      moneda: cotizacion.moneda || 'MXN',
+      fechaEntrega: (cotizacion as any).fechaEntrega || '',
+      notas: cotizacion.notas || '',
+      estatus: cotizacion.estatus || 'BORRADOR',
+      lineas: (cotizacion.detalles || []).map((d: DetalleCotizacion) => ({
+        descripcion: d.piezaNombre || '',
+        cantidad: d.cantidad || 1,
+        unidad: d.unidad || 'PZA',
+        precioUnitario: Number(d.precioUnitario) || 0,
+      })),
+    });
+    setShowEditModal(true);
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await put(`/api/cotizaciones/${id}`, {
+        moneda: editForm.moneda,
+        fechaEntrega: editForm.fechaEntrega || undefined,
+        notas: editForm.notas || undefined,
+        estatus: editForm.estatus,
+        lineas: editForm.lineas.length > 0
+          ? editForm.lineas.map(l => ({
+              descripcion: l.descripcion,
+              cantidad: Number(l.cantidad),
+              unidad: l.unidad,
+              precioUnitario: Number(l.precioUnitario),
+            }))
+          : undefined,
+      });
+      setShowEditModal(false);
+      await fetchCotizacion();
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar la cotización');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addEditLinea() {
+    setEditForm({
+      ...editForm,
+      lineas: [...editForm.lineas, { descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
+    });
+  }
+
+  function removeEditLinea(index: number) {
+    setEditForm({
+      ...editForm,
+      lineas: editForm.lineas.filter((_, i) => i !== index),
+    });
+  }
 
   // Loading state
   if (loading) {
@@ -224,7 +303,7 @@ export default function CotizacionDetallePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push(`/cotizaciones/${id}/edit`)}
+                  onClick={openEditModal}
                   disabled={!!actionLoading}
                   className="gap-2"
                 >
@@ -475,6 +554,192 @@ export default function CotizacionDetallePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+                <h2 className="text-lg font-semibold text-foreground">Editar Cotización {cotizacion?.folio}</h2>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Moneda
+                    </label>
+                    <select
+                      value={editForm.moneda}
+                      onChange={(e) => setEditForm({ ...editForm, moneda: e.target.value })}
+                      className="input-base"
+                    >
+                      <option value="MXN">MXN - Peso Mexicano</option>
+                      <option value="USD">USD - Dólar Americano</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Estatus
+                    </label>
+                    <select
+                      value={editForm.estatus}
+                      onChange={(e) => setEditForm({ ...editForm, estatus: e.target.value })}
+                      className="input-base"
+                    >
+                      <option value="BORRADOR">Borrador</option>
+                      <option value="ENVIADA">Enviada</option>
+                      <option value="EN_REVISION">En Revisión</option>
+                      <option value="ACEPTADA">Aprobada</option>
+                      <option value="RECHAZADA">Rechazada</option>
+                      <option value="CANCELADA">Cancelada</option>
+                      <option value="CONVERTIDA">Convertida</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Entrega
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.fechaEntrega}
+                    onChange={(e) => setEditForm({ ...editForm, fechaEntrega: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+
+                {/* Lineas */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Partidas
+                    </label>
+                    <Button type="button" variant="outline" size="sm" onClick={addEditLinea} className="gap-1">
+                      <Plus className="h-3 w-3" />
+                      Agregar Partida
+                    </Button>
+                  </div>
+                  {editForm.lineas.length === 0 ? (
+                    <p className="py-3 text-center text-xs text-muted-foreground">
+                      Agregue al menos una partida
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {editForm.lineas.map((l, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Descripción"
+                            value={l.descripcion}
+                            onChange={(e) => {
+                              const updated = [...editForm.lineas];
+                              updated[i] = { ...l, descripcion: e.target.value };
+                              setEditForm({ ...editForm, lineas: updated });
+                            }}
+                            className="input-base flex-1"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Cant."
+                            min={1}
+                            value={l.cantidad}
+                            onChange={(e) => {
+                              const updated = [...editForm.lineas];
+                              updated[i] = { ...l, cantidad: Number(e.target.value) };
+                              setEditForm({ ...editForm, lineas: updated });
+                            }}
+                            className="input-base w-20"
+                          />
+                          <select
+                            value={l.unidad}
+                            onChange={(e) => {
+                              const updated = [...editForm.lineas];
+                              updated[i] = { ...l, unidad: e.target.value };
+                              setEditForm({ ...editForm, lineas: updated });
+                            }}
+                            className="input-base w-24"
+                          >
+                            <option value="PZA">PZA</option>
+                            <option value="KG">KG</option>
+                            <option value="M">M</option>
+                            <option value="M²">M²</option>
+                            <option value="M³">M³</option>
+                            <option value="LT">LT</option>
+                            <option value="HR">HR</option>
+                            <option value="JGO">JGO</option>
+                            <option value="PAR">PAR</option>
+                          </select>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="Precio"
+                            min={0}
+                            value={l.precioUnitario}
+                            onChange={(e) => {
+                              const updated = [...editForm.lineas];
+                              updated[i] = { ...l, precioUnitario: Number(e.target.value) };
+                              setEditForm({ ...editForm, lineas: updated });
+                            }}
+                            className="input-base w-28"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => removeEditLinea(i)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Notas
+                  </label>
+                  <textarea
+                    value={editForm.notas}
+                    onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+                    rows={2}
+                    className="input-base resize-none"
+                    placeholder="Observaciones de la cotización"
+                  />
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    <AlertCircle className="h-5 w-5 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 border-t border-border pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEditModal(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                    {saving ? 'Guardando...' : 'Actualizar Cotización'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

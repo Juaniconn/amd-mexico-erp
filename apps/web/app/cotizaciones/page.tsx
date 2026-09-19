@@ -35,9 +35,10 @@ interface CotizacionFormData {
   lineas: { descripcion: string; cantidad: number; unidad: string; precioUnitario: number }[];
 }
 
-// Extended type to match API response which includes denormalizada fields
 interface CotizacionListItem extends Cotizacion {
   razonSocial?: string;
+  detalles?: any[];
+  fechaEntrega?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -104,11 +105,22 @@ function CotizacionesContent() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const limit = 10;
+
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [clientes, setClientes] = useState<{ id: string; razonSocial: string; monedaPref: string }[]>([]);
+  const [editingCotizacion, setEditingCotizacion] = useState<CotizacionListItem | null>(null);
 
   const [form, setForm] = useState<CotizacionFormData>({
+    clienteId: '',
+    moneda: 'MXN',
+    fechaEntrega: '',
+    notas: '',
+    lineas: [],
+  });
+
+  const [editForm, setEditForm] = useState<CotizacionFormData>({
     clienteId: '',
     moneda: 'MXN',
     fechaEntrega: '',
@@ -137,8 +149,7 @@ function CotizacionesContent() {
 
   useEffect(() => {
     loadCotizaciones(page, search, statusFilter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, loadCotizaciones, search, statusFilter]);
 
   function handleSearch() {
     setPage(1);
@@ -181,7 +192,26 @@ function CotizacionesContent() {
       lineas: [],
     });
     setShowModal(true);
-    // Load clientes for the select
+    get<{ data: { id: string; razonSocial: string; monedaPref: string }[] }>('/api/clientes?limit=100')
+      .then((res) => setClientes(res.data))
+      .catch(() => {});
+  }
+
+  function openEditCotizacion(c: CotizacionListItem) {
+    setEditingCotizacion(c);
+    setEditForm({
+      clienteId: c.clienteId || '',
+      moneda: c.moneda || 'MXN',
+      fechaEntrega: c.fechaEntrega || '',
+      notas: c.notas || '',
+      lineas: c.detalles?.map((l: any) => ({
+        descripcion: l.descripcion || l.piezaNombre || '',
+        cantidad: l.cantidad || 1,
+        unidad: l.unidad || 'PZA',
+        precioUnitario: l.precioUnitario || 0,
+      })) || [],
+    });
+    setShowEditModal(true);
     get<{ data: { id: string; razonSocial: string; monedaPref: string }[] }>('/api/clientes?limit=100')
       .then((res) => setClientes(res.data))
       .catch(() => {});
@@ -195,14 +225,17 @@ function CotizacionesContent() {
       await post('/api/cotizaciones', {
         clienteId: form.clienteId,
         moneda: form.moneda,
-        fechaEntrega: form.fechaEntrega || undefined,
         notas: form.notas || undefined,
-        lineas: form.lineas.length > 0
+        detalles: form.lineas.length > 0
           ? form.lineas.map(l => ({
-              descripcion: l.descripcion,
+              piezaNombre: l.descripcion,
+              piezaDescripcion: undefined,
               cantidad: Number(l.cantidad),
               unidad: l.unidad,
               precioUnitario: Number(l.precioUnitario),
+              tiempoEstimado: undefined,
+              procesoRequerido: undefined,
+              notas: undefined,
             }))
           : undefined,
       });
@@ -210,6 +243,40 @@ function CotizacionesContent() {
       loadCotizaciones(page, search, statusFilter);
     } catch (err: any) {
       setError(err?.message || 'Error al crear la cotización');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCotizacion) return;
+    setSaving(true);
+    setError('');
+    try {
+      await put(`/api/cotizaciones/${editingCotizacion.id}`, {
+        clienteId: editForm.clienteId,
+        moneda: editForm.moneda,
+        notas: editForm.notas || undefined,
+        estatus: editingCotizacion.estatus,
+        detalles: editForm.lineas.length > 0
+          ? editForm.lineas.map(l => ({
+              piezaNombre: l.descripcion,
+              piezaDescripcion: undefined,
+              cantidad: Number(l.cantidad),
+              unidad: l.unidad,
+              precioUnitario: Number(l.precioUnitario),
+              tiempoEstimado: undefined,
+              procesoRequerido: undefined,
+              notas: undefined,
+            }))
+          : undefined,
+      });
+      setShowEditModal(false);
+      setEditingCotizacion(null);
+      loadCotizaciones(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar la cotización');
     } finally {
       setSaving(false);
     }
@@ -229,7 +296,20 @@ function CotizacionesContent() {
     });
   }
 
-  // Stats calculations
+  function addEditLinea() {
+    setEditForm({
+      ...editForm,
+      lineas: [...editForm.lineas, { descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
+    });
+  }
+
+  function removeEditLinea(index: number) {
+    setEditForm({
+      ...editForm,
+      lineas: editForm.lineas.filter((_, i) => i !== index),
+    });
+  }
+
   const totalCotizaciones = meta?.total ?? cotizaciones.length;
   const pendientes = cotizaciones.filter((c) => c.estatus === 'BORRADOR' || c.estatus === 'EN_REVISION').length;
   const aceptadas = cotizaciones.filter((c) => c.estatus === 'ACEPTADA' || c.estatus === 'CONVERTIDA').length;
@@ -430,7 +510,7 @@ function CotizacionesContent() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => router.push(`/cotizaciones/${c.id}/edit`)}
+                      onClick={() => openEditCotizacion(c)}
                       title="Editar cotización"
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -678,6 +758,207 @@ function CotizacionesContent() {
                 </Button>
                 <Button type="submit" size="sm" className="gap-2" disabled={saving}>
                   {saving ? 'Guardando...' : 'Crear Cotización'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Cotización Modal */}
+      {showEditModal && editingCotizacion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Editar Cotización {editingCotizacion.folio}</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingCotizacion(null);
+                }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Cliente *
+                  </label>
+                  <select
+                    required
+                    value={editForm.clienteId}
+                    onChange={(e) => {
+                      const cliente = clientes.find((c) => c.id === e.target.value);
+                      setEditForm({
+                        ...editForm,
+                        clienteId: e.target.value,
+                        moneda: cliente?.monedaPref === 'USD' ? 'USD' : 'MXN',
+                      });
+                    }}
+                    className="input-base"
+                  >
+                    <option value="">Seleccionar cliente...</option>
+                    {clientes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.razonSocial}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Moneda
+                  </label>
+                  <select
+                    value={editForm.moneda}
+                    onChange={(e) => setEditForm({ ...editForm, moneda: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="MXN">MXN - Peso Mexicano</option>
+                    <option value="USD">USD - Dólar Americano</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Entrega
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.fechaEntrega}
+                    onChange={(e) => setEditForm({ ...editForm, fechaEntrega: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+              </div>
+
+              {/* Lineas */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Partidas
+                  </label>
+                  <Button type="button" variant="outline" size="sm" onClick={addEditLinea} className="gap-1">
+                    <Plus className="h-3 w-3" />
+                    Agregar Partida
+                  </Button>
+                </div>
+                {editForm.lineas.length === 0 ? (
+                  <p className="py-3 text-center text-xs text-muted-foreground">
+                    Agregue al menos una partida
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {editForm.lineas.map((l, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Descripción"
+                          value={l.descripcion}
+                          onChange={(e) => {
+                            const updated = [...editForm.lineas];
+                            updated[i] = { ...l, descripcion: e.target.value };
+                            setEditForm({ ...editForm, lineas: updated });
+                          }}
+                          className="input-base flex-1"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Cant."
+                          min={1}
+                          value={l.cantidad}
+                          onChange={(e) => {
+                            const updated = [...editForm.lineas];
+                            updated[i] = { ...l, cantidad: Number(e.target.value) };
+                            setEditForm({ ...editForm, lineas: updated });
+                          }}
+                          className="input-base w-20"
+                        />
+                        <select
+                          value={l.unidad}
+                          onChange={(e) => {
+                            const updated = [...editForm.lineas];
+                            updated[i] = { ...l, unidad: e.target.value };
+                            setEditForm({ ...editForm, lineas: updated });
+                          }}
+                          className="input-base w-24"
+                        >
+                          <option value="PZA">PZA</option>
+                          <option value="KG">KG</option>
+                          <option value="M">M</option>
+                          <option value="M²">M²</option>
+                          <option value="M³">M³</option>
+                          <option value="LT">LT</option>
+                          <option value="HR">HR</option>
+                          <option value="JGO">JGO</option>
+                          <option value="PAR">PAR</option>
+                        </select>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Precio"
+                          min={0}
+                          value={l.precioUnitario}
+                          onChange={(e) => {
+                            const updated = [...editForm.lineas];
+                            updated[i] = { ...l, precioUnitario: Number(e.target.value) };
+                            setEditForm({ ...editForm, lineas: updated });
+                          }}
+                          className="input-base w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => removeEditLinea(i)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={editForm.notas}
+                  onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Observaciones de la cotización"
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingCotizacion(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Actualizar Cotización'}
                 </Button>
               </div>
             </form>

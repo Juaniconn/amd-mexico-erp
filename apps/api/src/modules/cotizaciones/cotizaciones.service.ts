@@ -43,6 +43,7 @@ export class CotizacionesService {
           tipoCambio: data.tipoCambio
             ? new Prisma.Decimal(data.tipoCambio)
             : null,
+          moneda: (data.moneda || 'MXN') as any,
           subtotal: new Prisma.Decimal(subtotal),
           iva: new Prisma.Decimal(iva),
           total: new Prisma.Decimal(total),
@@ -213,6 +214,7 @@ export class CotizacionesService {
       if (data.tipoCambio !== undefined)
         updateData.tipoCambio = new Prisma.Decimal(data.tipoCambio);
       if (data.notas !== undefined) updateData.notas = data.notas;
+      if (data.moneda) updateData.moneda = data.moneda as any;
       if (data.estatus) updateData.estatus = data.estatus as any;
 
       const cotizacion = await this.prisma.cotizacion.update({
