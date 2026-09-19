@@ -177,7 +177,7 @@ function FormModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="card-premium w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button
@@ -220,7 +220,7 @@ function ConfirmDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="card-premium w-full max-w-sm p-6">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl">
         <p className="text-sm text-foreground">{message}</p>
         <div className="mt-4 flex justify-end gap-3">
           <Button variant="outline" size="sm" onClick={onCancel}>

@@ -19,7 +19,7 @@ export function FormModal({ open, onClose, title, children, maxWidth = 'max-w-lg
         className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
-      <div className={`card-premium w-full ${maxWidth} max-h-[90vh] overflow-y-auto p-6 animate-fade-up relative`}>
+      <div className={`w-full ${maxWidth} max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 animate-fade-up relative shadow-2xl`}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
           <Button variant="ghost" size="icon-sm" onClick={onClose} className="h-8 w-8">

@@ -158,20 +158,34 @@ function DashboardContent() {
         </button>
       </div>
 
-      {/* KPI Grid using StatCards */}
+      {/* KPI Grid — compact card grid */}
       <div>
         <h2 className="section-title mb-3">Métricas Principales</h2>
-        <StatGrid cols={4}>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {statCards.map((stat) => (
-            <StatCard
+            <div
               key={stat.key}
-              title={stat.title}
-              value={stats[stat.key]}
-              icon={<stat.icon className="h-5 w-5" />}
-              variant={stat.variant}
-            />
+              className="card-premium flex flex-col gap-3 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {stat.title}
+                </span>
+                <div className={`rounded-lg p-1.5 ${
+                  stat.variant === 'brand' ? 'bg-brand/10 text-brand' :
+                  stat.variant === 'success' ? 'bg-success/10 text-success' :
+                  stat.variant === 'warning' ? 'bg-warning/10 text-warning' :
+                  'bg-muted text-muted-foreground'
+                }`}>
+                  <stat.icon className="h-4 w-4" />
+                </div>
+              </div>
+              <span className="text-2xl font-bold tracking-tight text-foreground">
+                {stats[stat.key]}
+              </span>
+            </div>
           ))}
-        </StatGrid>
+        </div>
       </div>
 
       {/* Activity & Alerts */}
