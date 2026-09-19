@@ -33,6 +33,8 @@ import {
   Inbox,
   Loader2,
   ShieldAlert,
+  Edit3,
+  Building2,
 } from 'lucide-react';
 
 interface Cliente {
@@ -339,33 +341,53 @@ function ClientesContent() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <StatGrid cols={4}>
-        <StatCard
-          title="Total"
-          value={totalClientes}
-          icon={<Users className="h-4 w-4" />}
-          variant="default"
-        />
-        <StatCard
-          title="Activos"
-          value={activos}
-          icon={<UserCheck className="h-4 w-4" />}
-          variant="success"
-        />
-        <StatCard
-          title="Inactivos"
-          value={inactivos}
-          icon={<UserX className="h-4 w-4" />}
-          variant="danger"
-        />
-        <StatCard
-          title="Con cotizaciones"
-          value={conCotizaciones}
-          icon={<FileText className="h-4 w-4" />}
-          variant="warning"
-        />
-      </StatGrid>
+      {/* Stats Cards with borders */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Total</p>
+              <p className="text-2xl font-bold tracking-tight">{totalClientes}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+              <UserCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Activos</p>
+              <p className="text-2xl font-bold tracking-tight">{activos}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <UserX className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Inactivos</p>
+              <p className="text-2xl font-bold tracking-tight">{inactivos}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="section-title">Con cotizaciones</p>
+              <p className="text-2xl font-bold tracking-tight">{conCotizaciones}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Search/Filter Bar */}
       <SearchFilterBar
@@ -382,136 +404,124 @@ function ClientesContent() {
         <ErrorState message={error} onRetry={() => loadClientes(page, search)} />
       )}
 
-      {/* Table */}
-      <TableContainer>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Razón Social</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead>Ciudad</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Moneda</TableHead>
-              <TableHead>Desde</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8}>
-                  <LoadingInline />
-                </TableCell>
-              </TableRow>
-            ) : clientes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8}>
-                  <EmptyState />
-                </TableCell>
-              </TableRow>
-            ) : (
-              clientes.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.codigo}</TableCell>
-                  <TableCell>{c.razonSocial}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      {c.email && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Mail className="h-3 w-3" />{c.email}
-                        </span>
-                      )}
-                      {c.telefono && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Phone className="h-3 w-3" />{c.telefono}
-                        </span>
-                      )}
-                      {!c.email && !c.telefono && <span className="text-muted-foreground">—</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {c.ciudad ? (
-                      <span className="flex items-center gap-1 text-muted-foreground">
-                        <MapPin className="h-3 w-3" />{c.ciudad}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={c.activo !== false ? 'success' : 'destructive'}>
-                      {c.activo !== false ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{c.monedaPref || 'MXN'}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {new Date(c.createdAt).toLocaleDateString('es-MX')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(c)}
-                        title="Ver cliente"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(c)}
-                        title="Editar cliente"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDelete(c.id)}
-                        title="Eliminar cliente"
-                        className="text-danger hover:text-danger"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Pagination Footer */}
-        {meta && !loading && clientes.length > 0 && (
-          <div className="flex items-center justify-between border-t border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground rounded-b-xl">
-            <span>
-              Mostrando {clientes.length} de {meta.total} clientes
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page >= meta.totalPages}
-              >
-                Siguiente
-              </Button>
+      {/* Client Cards Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
             </div>
-          </div>
-        )}
-      </TableContainer>
+          ))}
+        </div>
+      ) : clientes.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {clientes.map((c) => (
+            <div
+              key={c.id}
+              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+            >
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                    c.activo !== false ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-foreground">{c.razonSocial}</h3>
+                    <p className="text-xs text-muted-foreground">{c.codigo}</p>
+                  </div>
+                </div>
+                <Badge variant={c.activo !== false ? 'success' : 'destructive'}>
+                  {c.activo !== false ? 'Activo' : 'Inactivo'}
+                </Badge>
+              </div>
+
+              {/* Card Body */}
+              <div className="mt-4 space-y-2">
+                {c.contacto && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Users className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{c.contacto}</span>
+                  </p>
+                )}
+                {c.email && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{c.email}</span>
+                  </p>
+                )}
+                {c.telefono && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Phone className="h-3.5 w-3.5 shrink-0" />
+                    <span>{c.telefono}</span>
+                  </p>
+                )}
+                {c.ciudad && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{c.ciudad}{c.estado ? `, ${c.estado}` : ''}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Card Footer */}
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {c._count?.cotizaciones ?? 0} cot.
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(c.createdAt).toLocaleDateString('es-MX')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(c)}
+                    title="Ver cliente"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => openEdit(c)}
+                    title="Editar cliente"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleDelete(c.id)}
+                    title="Eliminar cliente"
+                    className="text-danger hover:text-danger"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-border pt-4 text-center">
