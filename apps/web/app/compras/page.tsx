@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,9 +20,11 @@ import {
   AlertCircle,
   Inbox,
   Eye,
+  Pencil,
+  Trash2,
   X,
 } from 'lucide-react';
-import { get, post, ApiError } from '@/lib/api';
+import { get, post, patch, del, ApiError } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -95,7 +96,6 @@ export default function ComprasPage() {
 }
 
 function ComprasContent() {
-  const router = useRouter();
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
   const [meta, setMeta] = useState<OrdenCompraListResponse['meta'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +106,26 @@ function ComprasContent() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Detail modal state
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailOrden, setDetailOrden] = useState<OrdenCompra | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingOrden, setEditingOrden] = useState<OrdenCompra | null>(null);
+
   const [form, setForm] = useState<OrdenCompraFormData>({
+    clienteId: '',
+    cotizacionId: '',
+    moneda: 'MXN',
+    fechaEntrega: '',
+    condicionesPago: '',
+    notas: '',
+    proveedores: [],
+  });
+
+  const [editForm, setEditForm] = useState<OrdenCompraFormData>({
     clienteId: '',
     cotizacionId: '',
     moneda: 'MXN',
@@ -205,6 +224,115 @@ function ComprasContent() {
       ...form,
       proveedores: form.proveedores.filter((_, i) => i !== index),
     });
+  }
+
+  function addEditProveedorRow() {
+    setEditForm({
+      ...editForm,
+      proveedores: [...editForm.proveedores, { proveedorId: '', cantidad: 1, precioUnitario: 0 }],
+    });
+  }
+
+  function removeEditProveedorRow(index: number) {
+    setEditForm({
+      ...editForm,
+      proveedores: editForm.proveedores.filter((_, i) => i !== index),
+    });
+  }
+
+  // ─── Detail Modal Functions ────────────────────────────────
+
+  async function openDetailCard(o: OrdenCompra) {
+    setDetailOrden(null);
+    setDetailLoading(true);
+    setShowDetailModal(true);
+    try {
+      const res = await get<OrdenCompra>(`/api/ordenes-compra/${o.id}`);
+      setDetailOrden(res);
+    } catch (err: any) {
+      setError(err?.message || 'Error al cargar la orden de compra');
+      setShowDetailModal(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailOrden) return;
+    if (!confirm('¿Está seguro de eliminar esta orden de compra?')) return;
+    try {
+      setError('');
+      await del(`/api/ordenes-compra/${detailOrden.id}`);
+      setShowDetailModal(false);
+      setDetailOrden(null);
+      loadOrdenes(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailOrden) return;
+    setEditingOrden(detailOrden);
+    setEditForm({
+      clienteId: detailOrden.clienteId || '',
+      cotizacionId: detailOrden.cotizacionId || '',
+      moneda: detailOrden.moneda || 'MXN',
+      fechaEntrega: detailOrden.fechaEntrega || '',
+      condicionesPago: detailOrden.condicionesPago || '',
+      notas: detailOrden.notas || '',
+      proveedores: detailOrden.proveedores?.map(p => ({
+        proveedorId: p.proveedorId,
+        cantidad: p.cantidad,
+        precioUnitario: p.precioUnitario,
+        notas: p.notas,
+      })) || [],
+    });
+    setShowDetailModal(false);
+    setShowEditModal(true);
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingOrden) return;
+    setSaving(true);
+    setError('');
+    try {
+      await patch(`/api/ordenes-compra/${editingOrden.id}`, {
+        clienteId: editForm.clienteId,
+        cotizacionId: editForm.cotizacionId || undefined,
+        moneda: editForm.moneda,
+        fechaEntrega: editForm.fechaEntrega || undefined,
+        condicionesPago: editForm.condicionesPago || undefined,
+        notas: editForm.notas || undefined,
+        proveedores: editForm.proveedores.length > 0
+          ? editForm.proveedores.map(p => ({
+              proveedorId: p.proveedorId,
+              cantidad: Number(p.cantidad),
+              precioUnitario: Number(p.precioUnitario),
+              notas: p.notas || undefined,
+            }))
+          : undefined,
+      });
+      setShowEditModal(false);
+      setEditingOrden(null);
+      loadOrdenes(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar la orden de compra');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteOrden(id: string) {
+    if (!confirm('¿Está seguro de eliminar esta orden de compra?')) return;
+    try {
+      setError('');
+      await del(`/api/ordenes-compra/${id}`);
+      loadOrdenes(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
   }
 
   // Stats calculations
@@ -348,7 +476,8 @@ function ComprasContent() {
           {ordenes.map((o) => (
             <div
               key={o.id}
-              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              onClick={() => openDetailCard(o)}
+              className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
@@ -363,12 +492,7 @@ function ComprasContent() {
                     <ShoppingCart className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <button
-                      onClick={() => router.push(`/compras/${o.id}`)}
-                      className="truncate text-sm font-semibold text-foreground hover:text-primary hover:underline focus:outline-none"
-                    >
-                      {o.folio}
-                    </button>
+                    <h3 className="truncate text-sm font-semibold text-foreground">{o.folio}</h3>
                     <p className="text-xs text-muted-foreground truncate">{o.razonSocial || o.clienteId}</p>
                   </div>
                 </div>
@@ -403,24 +527,53 @@ function ComprasContent() {
 
               {/* Card Footer */}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Package className="h-3 w-3" />
-                    {getProductosCount(o)} prod.
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(o.createdAt).toLocaleDateString('es-MX')}
-                  </span>
-                </div>
+                <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => router.push(`/compras/${o.id}`)}
-                    title="Ver orden"
+                    onClick={(e) => { e.stopPropagation(); openDetailCard(o); }}
+                    title="Ver detalle"
                   >
                     <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setEditingOrden(o);
+                      setEditForm({
+                        clienteId: o.clienteId || '',
+                        cotizacionId: o.cotizacionId || '',
+                        moneda: o.moneda || 'MXN',
+                        fechaEntrega: o.fechaEntrega || '',
+                        condicionesPago: o.condicionesPago || '',
+                        notas: o.notas || '',
+                        proveedores: o.proveedores?.map(p => ({
+                          proveedorId: p.proveedorId,
+                          cantidad: p.cantidad,
+                          precioUnitario: p.precioUnitario,
+                          notas: p.notas,
+                        })) || [],
+                      });
+                      setShowEditModal(true);
+                    }}
+                    title="Editar orden"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      handleDeleteOrden(o.id); 
+                    }}
+                    title="Eliminar orden"
+                    className="text-danger hover:text-danger"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -635,6 +788,306 @@ function ComprasContent() {
                 </Button>
                 <Button type="submit" size="sm" className="gap-2" disabled={saving}>
                   {saving ? 'Guardando...' : 'Crear Orden'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {showDetailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="ml-2 text-sm text-muted-foreground">Cargando...</span>
+              </div>
+            ) : detailOrden ? (
+              <>
+                <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">{detailOrden.folio}</h2>
+                    <p className="text-xs text-muted-foreground">{detailOrden.razonSocial || '—'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      setDetailOrden(null);
+                    }}
+                    className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Info Grid */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="section-title">Folio</p>
+                      <p className="text-sm text-foreground">{detailOrden.folio}</p>
+                    </div>
+                    <div>
+                      <p className="section-title">Razón Social</p>
+                      <p className="text-sm text-foreground">{detailOrden.razonSocial || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="section-title">Proveedor</p>
+                      <p className="text-sm text-foreground">{detailOrden.proveedores?.[0]?.proveedorNombre || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="section-title">Total</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {detailOrden.moneda === 'USD' ? '$' : '$'}
+                        {Number(detailOrden.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="section-title">Moneda</p>
+                      <p className="text-sm text-foreground">{detailOrden.moneda}</p>
+                    </div>
+                    <div>
+                      <p className="section-title">Estatus</p>
+                      <StatusBadge estatus={detailOrden.estatus} />
+                    </div>
+                    <div>
+                      <p className="section-title">Fecha</p>
+                      <p className="text-sm text-foreground">{new Date(detailOrden.fecha).toLocaleDateString('es-MX')}</p>
+                    </div>
+                    <div>
+                      <p className="section-title">Condiciones de Pago</p>
+                      <p className="text-sm text-foreground">{detailOrden.condicionesPago || '—'}</p>
+                    </div>
+                  </div>
+
+                  {/* Notas */}
+                  {detailOrden.notas && (
+                    <div>
+                      <p className="section-title">Notas</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{detailOrden.notas}</p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={openEditFromDetail}
+                      className="gap-2"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteFromDetail}
+                      className="gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingOrden && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Editar Orden de Compra {editingOrden.folio}</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingOrden(null);
+                }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.clienteId}
+                    onChange={(e) => setEditForm({ ...editForm, clienteId: e.target.value })}
+                    className="input-base"
+                    placeholder="ID del cliente"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Cotización (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.cotizacionId}
+                    onChange={(e) => setEditForm({ ...editForm, cotizacionId: e.target.value })}
+                    className="input-base"
+                    placeholder="ID de cotización"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Moneda
+                  </label>
+                  <select
+                    value={editForm.moneda}
+                    onChange={(e) => setEditForm({ ...editForm, moneda: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="MXN">MXN - Peso Mexicano</option>
+                    <option value="USD">USD - Dólar Americano</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Entrega
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.fechaEntrega}
+                    onChange={(e) => setEditForm({ ...editForm, fechaEntrega: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Condiciones de Pago
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.condicionesPago}
+                    onChange={(e) => setEditForm({ ...editForm, condicionesPago: e.target.value })}
+                    className="input-base"
+                    placeholder="30 días"
+                  />
+                </div>
+              </div>
+
+              {/* Proveedores */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Proveedores
+                  </label>
+                  <Button type="button" variant="outline" size="sm" onClick={addEditProveedorRow} className="gap-1">
+                    <Plus className="h-3 w-3" />
+                    Agregar
+                  </Button>
+                </div>
+                {editForm.proveedores.length === 0 ? (
+                  <p className="py-3 text-center text-xs text-muted-foreground">
+                    Agregue al menos un proveedor
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {editForm.proveedores.map((p, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="ID Proveedor"
+                          value={p.proveedorId}
+                          onChange={(e) => {
+                            const updated = [...editForm.proveedores];
+                            updated[i] = { ...p, proveedorId: e.target.value };
+                            setEditForm({ ...editForm, proveedores: updated });
+                          }}
+                          className="input-base flex-1"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Cantidad"
+                          min={1}
+                          value={p.cantidad}
+                          onChange={(e) => {
+                            const updated = [...editForm.proveedores];
+                            updated[i] = { ...p, cantidad: Number(e.target.value) };
+                            setEditForm({ ...editForm, proveedores: updated });
+                          }}
+                          className="input-base w-24"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Precio"
+                          min={0}
+                          value={p.precioUnitario}
+                          onChange={(e) => {
+                            const updated = [...editForm.proveedores];
+                            updated[i] = { ...p, precioUnitario: Number(e.target.value) };
+                            setEditForm({ ...editForm, proveedores: updated });
+                          }}
+                          className="input-base w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => removeEditProveedorRow(i)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={editForm.notas}
+                  onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Observaciones de la orden"
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingOrden(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Actualizar Orden'}
                 </Button>
               </div>
             </form>

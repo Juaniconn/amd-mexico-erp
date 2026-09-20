@@ -13,11 +13,13 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { get, post, patch } from '@/lib/api';
+import { get, post, patch, del } from '@/lib/api';
 import {
   Search,
   Plus,
+  Eye,
   Pencil,
+  Trash2,
   X,
   Users,
   UserCheck,
@@ -27,6 +29,8 @@ import {
   Loader2,
   ShieldAlert,
   Inbox,
+  Mail,
+  Calendar,
 } from 'lucide-react';
 
 interface Usuario {
@@ -39,6 +43,7 @@ interface Usuario {
   activo: boolean;
   ultimoAcceso: string | null;
   sucursalId: string | null;
+  sucursal?: string;
   createdAt: string;
 }
 
@@ -234,16 +239,159 @@ function ConfirmDialog({
   );
 }
 
+// ─── Detail Modal ───────────────────────────────────────
+
+function DetailModal({
+  usuario,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  usuario: Usuario;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+        {/* Header */}
+        <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+              usuario.activo ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+            }`}>
+              <span className="text-sm font-bold">
+                {usuario.nombre?.[0]}{usuario.apellido?.[0]}
+              </span>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                {usuario.nombre} {usuario.apellido}
+              </h2>
+              <p className="text-sm text-muted-foreground">@{usuario.username}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Detail Fields */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Nombre</p>
+              <p className="mt-1 text-sm text-foreground">{usuario.nombre}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Apellido</p>
+              <p className="mt-1 text-sm text-foreground">{usuario.apellido}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Username</p>
+            <p className="mt-1 text-sm text-foreground">@{usuario.username}</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Email</p>
+            <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+              <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              {usuario.email}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Rol</p>
+              <div className="mt-1">
+                <RoleBadge role={usuario.role} />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Estado</p>
+              <div className="mt-1">
+                <StatusBadge active={usuario.activo} />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Último Acceso</p>
+            <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              {formatDate(usuario.ultimoAcceso)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Sucursal</p>
+            <p className="mt-1 text-sm text-foreground">
+              {usuario.sucursal || usuario.sucursalId || '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+          >
+            Cerrar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onDelete}
+            className="gap-2 text-danger hover:text-danger"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Eliminar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={onEdit}
+            className="gap-2"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page Component ────────────────────────────────────
 
 export default function UsuariosPage() {
+  return (
+    <AppLayout>
+      <UsuariosContent />
+    </AppLayout>
+  );
+}
+
+function UsuariosContent() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [meta, setMeta] = useState<{ total: number; page: number; limit: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [editingUser, setEditingUser] = useState<Usuario | null>(null);
+  const [detailUsuario, setDetailUsuario] = useState<Usuario | null>(null);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -344,6 +492,44 @@ export default function UsuariosPage() {
     setConfirmToggle({ user, action: user.activo ? 'desactivar' : 'activar' });
   }
 
+  // ─── Detail Modal Handlers ─────────────────────────────
+
+  function openDetailCard(u: Usuario) {
+    setDetailUsuario(u);
+    setShowDetailModal(true);
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailUsuario) return;
+    if (!confirm('¿Está seguro de eliminar este usuario?')) return;
+    try {
+      setError('');
+      await del(`/api/usuarios/${detailUsuario.id}`);
+      setShowDetailModal(false);
+      setDetailUsuario(null);
+      loadUsuarios(meta?.page ?? 1, search, filterRole);
+      setSuccess('Usuario eliminado correctamente');
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailUsuario) return;
+    setEditingUser(detailUsuario);
+    setFormData({
+      email: detailUsuario.email,
+      nombre: detailUsuario.nombre,
+      apellido: detailUsuario.apellido,
+      username: detailUsuario.username,
+      password: '',
+      role: detailUsuario.role,
+      sucursalId: detailUsuario.sucursalId || '',
+    });
+    setShowDetailModal(false);
+    setShowForm(true);
+  }
+
   const filtered = usuarios.filter(u => {
     const matchSearch = !search || `${u.nombre} ${u.apellido} ${u.email} ${u.username}`.toLowerCase().includes(search.toLowerCase());
     const matchRole = !filterRole || u.role === filterRole;
@@ -357,310 +543,337 @@ export default function UsuariosPage() {
   const inactivos = usuarios.filter(u => !u.activo).length;
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Usuarios</h1>
-            <p className="text-sm text-muted-foreground">Gestión de usuarios, roles y acceso al sistema</p>
-          </div>
-          <Button onClick={() => { resetForm(); setShowForm(true); }} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Usuario
-          </Button>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Usuarios</h1>
+          <p className="text-sm text-muted-foreground">Gestión de usuarios, roles y acceso al sistema</p>
         </div>
+        <Button onClick={() => { resetForm(); setShowForm(true); }} size="sm" className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nuevo Usuario
+        </Button>
+      </div>
 
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success-muted px-4 py-3 text-sm text-success">
-            <UserCheck className="h-5 w-5 shrink-0" />
-            <span>{success}</span>
-          </div>
-        )}
-        {error && !showForm && (
-          <ErrorState message={error} onRetry={() => loadUsuarios(meta?.page ?? 1, search, filterRole)} />
-        )}
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success-muted px-4 py-3 text-sm text-success">
+          <UserCheck className="h-5 w-5 shrink-0" />
+          <span>{success}</span>
+        </div>
+      )}
+      {error && !showForm && (
+        <ErrorState message={error} onRetry={() => loadUsuarios(meta?.page ?? 1, search, filterRole)} />
+      )}
 
-        {/* Search & Filter */}
-        <SearchFilterBar
-          search={search}
-          onSearchChange={setSearch}
-          onSearch={() => loadUsuarios(1, search, filterRole)}
-          filterRole={filterRole}
-          onFilterChange={setFilterRole}
-          placeholder="Buscar por nombre, email o usuario..."
-        />
+      {/* Search & Filter */}
+      <SearchFilterBar
+        search={search}
+        onSearchChange={setSearch}
+        onSearch={() => loadUsuarios(1, search, filterRole)}
+        filterRole={filterRole}
+        onFilterChange={setFilterRole}
+        placeholder="Buscar por nombre, email o usuario..."
+      />
 
-        {/* Stats Row — card grid matching Clientes pattern */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="section-title">Total</p>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{totalUsuarios}</p>
-              </div>
-              <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
-                <Users className="h-5 w-5" />
-              </div>
+      {/* Stats Row — card grid matching Clientes pattern */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="section-title">Total</p>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{totalUsuarios}</p>
             </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="section-title">Activos</p>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{activos}</p>
-              </div>
-              <div className="ml-3 shrink-0 rounded-lg p-2 bg-success/10 text-success">
-                <UserCheck className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="section-title">Admins</p>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{admins}</p>
-              </div>
-              <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
-                <Shield className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="section-title">Inactivos</p>
-                <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{inactivos}</p>
-              </div>
-              <div className="ml-3 shrink-0 rounded-lg p-2 bg-destructive/10 text-destructive">
-                <UserX className="h-5 w-5" />
-              </div>
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
+              <Users className="h-5 w-5" />
             </div>
           </div>
         </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="section-title">Activos</p>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{activos}</p>
+            </div>
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-success/10 text-success">
+              <UserCheck className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="section-title">Admins</p>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{admins}</p>
+            </div>
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
+              <Shield className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-destructive/30 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="section-title">Inactivos</p>
+              <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{inactivos}</p>
+            </div>
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-destructive/10 text-destructive">
+              <UserX className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* User Cards Grid — matching Clientes pattern */}
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-muted" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-muted" />
-                    <div className="h-3 w-1/2 rounded bg-muted" />
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="h-3 w-full rounded bg-muted" />
-                  <div className="h-3 w-2/3 rounded bg-muted" />
+      {/* User Cards Grid — matching Clientes pattern with onClick */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
                 </div>
               </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(user => (
-              <div
-                key={user.id}
-                className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
-              >
-                {/* Card Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                      user.activo ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
-                    }`}>
-                      <span className="text-sm font-bold">
-                        {user.nombre?.[0]}{user.apellido?.[0]}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-foreground">
-                        {user.nombre} {user.apellido}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">@{user.username}</p>
-                    </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map(user => (
+            <div
+              key={user.id}
+              onClick={() => openDetailCard(user)}
+              className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+            >
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                    user.activo ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <span className="text-sm font-bold">
+                      {user.nombre?.[0]}{user.apellido?.[0]}
+                    </span>
                   </div>
-                  <StatusBadge active={user.activo} />
-                </div>
-
-                {/* Card Body */}
-                <div className="mt-4 space-y-2">
-                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Users className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{user.email}</span>
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <RoleBadge role={user.role} />
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-foreground">
+                      {user.nombre} {user.apellido}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">@{user.username}</p>
                   </div>
-                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                    <span>Último acceso: {formatDate(user.ultimoAcceso)}</span>
-                  </p>
                 </div>
+                <StatusBadge active={user.activo} />
+              </div>
 
-                {/* Card Footer */}
-                <div className="mt-4 flex items-center justify-end gap-1 border-t border-border pt-3">
+              {/* Card Body */}
+              <div className="mt-4 space-y-2">
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Users className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{user.email}</span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <RoleBadge role={user.role} />
+                </div>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  <span>Último acceso: {formatDate(user.ultimoAcceso)}</span>
+                </p>
+              </div>
+
+              {/* Card Footer */}
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
+                <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    onClick={(e) => { e.stopPropagation(); openDetailCard(user); }}
+                    title="Ver detalle"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => { e.stopPropagation(); startEdit(user); }}
                     title="Editar"
-                    onClick={() => startEdit(user)}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    onClick={(e) => { e.stopPropagation(); requestToggleActive(user); }}
                     title={user.activo ? 'Desactivar' : 'Activar'}
-                    onClick={() => requestToggleActive(user)}
                     className={user.activo ? 'text-warning hover:text-warning' : 'text-success hover:text-success'}
                   >
                     {user.activo ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {meta && !loading && filtered.length > 0 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
+          <span>
+            Mostrando {filtered.length} de {meta.total} usuarios
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadUsuarios(meta.page - 1, search, filterRole)}
+              disabled={meta.page <= 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadUsuarios(meta.page + 1, search, filterRole)}
+              disabled={meta.page >= meta.totalPages}
+            >
+              Siguiente
+            </Button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Pagination Footer */}
-        {meta && !loading && filtered.length > 0 && (
-          <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
-            <span>
-              Mostrando {filtered.length} de {meta.total} usuarios
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadUsuarios(meta.page - 1, search, filterRole)}
-                disabled={meta.page <= 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadUsuarios(meta.page + 1, search, filterRole)}
-                disabled={meta.page >= meta.totalPages}
-              >
-                Siguiente
-              </Button>
-            </div>
-          </div>
-        )}
+      {/* Footer */}
+      <footer className="border-t border-border pt-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} AMD México Operations ERP
+        </p>
+      </footer>
 
-        {/* Modal Form */}
-        {showForm && (
-          <FormModal
-            title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-            onClose={resetForm}
-            onSubmit={handleSubmit}
-            loading={saving}
-          >
-            {/* Nombre + Apellido */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Nombre *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.nombre}
-                  onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                  className="input-base"
-                  placeholder="Juan"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Apellido *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.apellido}
-                  onChange={e => setFormData({ ...formData, apellido: e.target.value })}
-                  className="input-base"
-                  placeholder="Pérez"
-                />
-              </div>
-            </div>
+      {/* Detail Modal */}
+      {showDetailModal && detailUsuario && (
+        <DetailModal
+          usuario={detailUsuario}
+          onClose={() => { setShowDetailModal(false); setDetailUsuario(null); }}
+          onEdit={openEditFromDetail}
+          onDelete={handleDeleteFromDetail}
+        />
+      )}
 
-            {/* Email */}
+      {/* Form Modal */}
+      {showForm && (
+        <FormModal
+          title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+          onClose={resetForm}
+          onSubmit={handleSubmit}
+          loading={saving}
+        >
+          {/* Nombre + Apellido */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Email *</label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="input-base"
-                placeholder="juan@amd-mexico.com"
-              />
-              {formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
-                <p className="mt-1 text-xs text-danger">Ingrese un email válido</p>
-              )}
-            </div>
-
-            {/* Username */}
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Username *</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Nombre *</label>
               <input
                 type="text"
                 required
-                value={formData.username}
-                onChange={e => setFormData({ ...formData, username: e.target.value })}
+                value={formData.nombre}
+                onChange={e => setFormData({ ...formData, nombre: e.target.value })}
                 className="input-base"
-                placeholder="juanperez"
+                placeholder="Juan"
               />
             </div>
-
-            {/* Password */}
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Contraseña {editingUser ? '(dejar vacío para no cambiar)' : '*'}
-              </label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Apellido *</label>
               <input
-                type="password"
-                required={!editingUser}
-                value={formData.password}
-                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                type="text"
+                required
+                value={formData.apellido}
+                onChange={e => setFormData({ ...formData, apellido: e.target.value })}
                 className="input-base"
-                placeholder="••••••••"
+                placeholder="Pérez"
               />
-              {formData.password && formData.password.length < 8 && (
-                <p className="mt-1 text-xs text-warning">La contraseña debe tener al menos 8 caracteres</p>
-              )}
             </div>
+          </div>
 
-            {/* Role */}
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Rol *</label>
-              <select
-                value={formData.role}
-                onChange={e => setFormData({ ...formData, role: e.target.value as Usuario['role'] })}
-                className="input-base"
-              >
-                <option value="OPERADOR">Operador</option>
-                <option value="SUPERVISOR">Supervisor</option>
-                <option value="ADMIN">Administrador</option>
-              </select>
-            </div>
-          </FormModal>
-        )}
+          {/* Email */}
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Email *</label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={e => setFormData({ ...formData, email: e.target.value })}
+              className="input-base"
+              placeholder="juan@amd-mexico.com"
+            />
+            {formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
+              <p className="mt-1 text-xs text-danger">Ingrese un email válido</p>
+            )}
+          </div>
 
-        {/* Toggle Confirm Dialog */}
-        {confirmToggle && (
-          <ConfirmDialog
-            message={`¿Está seguro de ${confirmToggle.action} al usuario ${confirmToggle.user.nombre} ${confirmToggle.user.apellido}?`}
-            onConfirm={confirmToggleActive}
-            onCancel={() => setConfirmToggle(null)}
-          />
-        )}
-      </div>
-    </AppLayout>
+          {/* Username */}
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Username *</label>
+            <input
+              type="text"
+              required
+              value={formData.username}
+              onChange={e => setFormData({ ...formData, username: e.target.value })}
+              className="input-base"
+              placeholder="juanperez"
+            />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Contraseña {editingUser ? '(dejar vacío para no cambiar)' : '*'}
+            </label>
+            <input
+              type="password"
+              required={!editingUser}
+              value={formData.password}
+              onChange={e => setFormData({ ...formData, password: e.target.value })}
+              className="input-base"
+              placeholder="••••••••"
+            />
+            {formData.password && formData.password.length < 8 && (
+              <p className="mt-1 text-xs text-warning">La contraseña debe tener al menos 8 caracteres</p>
+            )}
+          </div>
+
+          {/* Role */}
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Rol *</label>
+            <select
+              value={formData.role}
+              onChange={e => setFormData({ ...formData, role: e.target.value as Usuario['role'] })}
+              className="input-base"
+            >
+              <option value="OPERADOR">Operador</option>
+              <option value="SUPERVISOR">Supervisor</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
+          </div>
+        </FormModal>
+      )}
+
+      {/* Toggle Confirm Dialog */}
+      {confirmToggle && (
+        <ConfirmDialog
+          message={`¿Está seguro de ${confirmToggle.action} al usuario ${confirmToggle.user.nombre} ${confirmToggle.user.apellido}?`}
+          onConfirm={confirmToggleActive}
+          onCancel={() => setConfirmToggle(null)}
+        />
+      )}
+    </div>
   );
 }

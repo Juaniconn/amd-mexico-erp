@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +8,8 @@ import {
   Search,
   Plus,
   Eye,
+  Pencil,
+  Trash2,
   X,
   ClipboardList,
   Loader2,
@@ -19,7 +20,7 @@ import {
   Timer,
   FileText,
 } from 'lucide-react';
-import { get, post, OrdenTrabajo } from '@/lib/api';
+import { get, post, patch, del, OrdenTrabajo } from '@/lib/api';
 
 const ESTATUS_OPTIONS = [
   { value: 'PENDIENTE', label: 'Pendiente' },
@@ -96,7 +97,6 @@ export default function ProduccionPage() {
 }
 
 function ProduccionContent() {
-  const router = useRouter();
   const [ordenes, setOrdenes] = useState<OrdenTrabajo[]>([]);
   const [meta, setMeta] = useState<{ total: number; page: number; limit: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +106,11 @@ function ProduccionContent() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<OrdenTrabajo | null>(null);
+  const [detailOT, setDetailOT] = useState<OrdenTrabajo | null>(null);
 
   const [form, setForm] = useState<OrdenTrabajoFormData>({
     piezaNombre: '',
@@ -155,6 +159,7 @@ function ProduccionContent() {
   }
 
   function openNewOT() {
+    setEditing(null);
     setForm({
       piezaNombre: '',
       piezaDescripcion: '',
@@ -166,6 +171,38 @@ function ProduccionContent() {
       notas: '',
     });
     setShowModal(true);
+  }
+
+  function openEdit(o: OrdenTrabajo) {
+    setEditing(o);
+    setForm({
+      piezaNombre: o.folio || '',
+      piezaDescripcion: '',
+      cantidad: 1,
+      unidad: 'pieza',
+      fechaInicio: '',
+      fechaFinEstimada: '',
+      prioridad: o.prioridad as 'ALTA' | 'MEDIA' | 'BAJA',
+      notas: o.notas || '',
+    });
+    setShowEditModal(true);
+  }
+
+  function openEditFromDetail() {
+    if (!detailOT) return;
+    setEditing(detailOT);
+    setForm({
+      piezaNombre: detailOT.folio || '',
+      piezaDescripcion: '',
+      cantidad: 1,
+      unidad: 'pieza',
+      fechaInicio: '',
+      fechaFinEstimada: '',
+      prioridad: detailOT.prioridad as 'ALTA' | 'MEDIA' | 'BAJA',
+      notas: detailOT.notas || '',
+    });
+    setShowDetailModal(false);
+    setShowEditModal(true);
   }
 
   async function handleSubmitOT(e: React.FormEvent) {
@@ -189,6 +226,58 @@ function ProduccionContent() {
       setError(err?.message || 'Error al crear la orden de trabajo');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    setSaving(true);
+    setError('');
+    try {
+      await patch(`/api/ordenes-trabajo/${editing.id}`, {
+        prioridad: form.prioridad,
+        notas: form.notas || undefined,
+        fechaInicio: form.fechaInicio || undefined,
+        fechaFinEstimada: form.fechaFinEstimada || undefined,
+      });
+      setShowEditModal(false);
+      setEditing(null);
+      loadOrdenes(page, search, estatusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar la orden de trabajo');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openDetailCard(o: OrdenTrabajo) {
+    setDetailOT(o);
+    setShowDetailModal(true);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Está seguro de eliminar esta orden de trabajo?')) return;
+    try {
+      setError('');
+      await del(`/api/ordenes-trabajo/${id}`);
+      loadOrdenes(page, search, estatusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailOT) return;
+    if (!confirm('¿Está seguro de eliminar esta orden de trabajo?')) return;
+    try {
+      setError('');
+      await del(`/api/ordenes-trabajo/${detailOT.id}`);
+      setShowDetailModal(false);
+      setDetailOT(null);
+      loadOrdenes(page, search, estatusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
     }
   }
 
@@ -336,7 +425,8 @@ function ProduccionContent() {
           {ordenes.map((o) => (
             <div
               key={o.id}
-              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              onClick={() => openDetailCard(o)}
+              className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
@@ -349,12 +439,7 @@ function ProduccionContent() {
                     <ClipboardList className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <button
-                      onClick={() => router.push(`/produccion/ot/${o.id}`)}
-                      className="block truncate text-sm font-semibold text-foreground hover:text-primary focus:outline-none"
-                    >
-                      {o.folio}
-                    </button>
+                    <h3 className="truncate text-sm font-semibold text-foreground">{o.folio}</h3>
                     <p className="truncate text-xs text-muted-foreground">
                       {o.cotizacion?.cliente?.razonSocial || '—'}
                     </p>
@@ -391,24 +476,32 @@ function ProduccionContent() {
 
               {/* Card Footer */}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <ClipboardList className="h-3 w-3" />
-                    OT
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <CalendarDays className="h-3 w-3" />
-                    {formatDate(o.createdAt)}
-                  </span>
-                </div>
+                <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => router.push(`/produccion/ot/${o.id}`)}
+                    onClick={(e) => { e.stopPropagation(); openDetailCard(o); }}
                     title="Ver detalle"
                   >
                     <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => { e.stopPropagation(); openEdit(o); }}
+                    title="Editar orden"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(o.id); }}
+                    title="Eliminar orden"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -564,6 +657,181 @@ function ProduccionContent() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit OT Modal */}
+      {showEditModal && editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Editar OT {editing.folio}</h2>
+              <button
+                onClick={() => { setShowEditModal(false); setEditing(null); }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Prioridad
+                </label>
+                <select
+                  value={form.prioridad}
+                  onChange={(e) => setForm({ ...form, prioridad: e.target.value as 'ALTA' | 'MEDIA' | 'BAJA' })}
+                  className="input-base"
+                >
+                  <option value="ALTA">Alta</option>
+                  <option value="MEDIA">Media</option>
+                  <option value="BAJA">Baja</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Inicio
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaInicio}
+                    onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Fecha Fin Estimada
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaFinEstimada}
+                    onChange={(e) => setForm({ ...form, fechaFinEstimada: e.target.value })}
+                    className="input-base"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={form.notas}
+                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                  rows={3}
+                  className="input-base resize-none"
+                  placeholder="Observaciones de la orden"
+                />
+              </div>
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowEditModal(false); setEditing(null); }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Actualizar OT'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {showDetailModal && detailOT && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">{detailOT.folio}</h2>
+                <p className="text-xs text-muted-foreground">{detailOT.cotizacion?.cliente?.razonSocial || '—'}</p>
+              </div>
+              <button
+                onClick={() => { setShowDetailModal(false); setDetailOT(null); }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Info Grid */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="section-title">Folio</p>
+                  <p className="text-sm text-foreground">{detailOT.folio}</p>
+                </div>
+                <div>
+                  <p className="section-title">Cliente</p>
+                  <p className="text-sm text-foreground">{detailOT.cotizacion?.cliente?.razonSocial || '—'}</p>
+                </div>
+                <div>
+                  <p className="section-title">Estatus</p>
+                  <Badge variant={getEstatusBadgeVariant(detailOT.estatus)}>
+                    {getEstatusLabel(detailOT.estatus)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="section-title">Prioridad</p>
+                  <Badge variant={getPrioridadBadgeVariant(detailOT.prioridad)}>
+                    {getPrioridadLabel(detailOT.prioridad)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="section-title">Fecha</p>
+                  <p className="text-sm text-foreground">{formatDate(detailOT.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="section-title">Partes</p>
+                  <p className="text-sm text-foreground">{detailOT._count?.partes ?? 0}</p>
+                </div>
+              </div>
+
+              {/* Notas */}
+              {detailOT.notas && (
+                <div>
+                  <p className="section-title">Notas</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{detailOT.notas}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openEditFromDetail}
+                  className="gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteFromDetail}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

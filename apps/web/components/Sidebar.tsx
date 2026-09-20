@@ -33,7 +33,6 @@ const modules = [
   { section: 'Operaciones', items: [
     { href: '/clientes', icon: Users, label: 'Clientes' },
     { href: '/cotizaciones', icon: FileText, label: 'Cotizaciones' },
-    { href: '/cotizaciones/[id]', icon: FileText, label: 'Detalle Cotización' },
   ]},
   { section: 'Producción', items: [
     { href: '/produccion', icon: Hammer, label: 'Producción' },

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +19,11 @@ import {
   Tags,
   X,
   Eye,
+  Pencil,
+  Trash2,
   Calendar,
 } from 'lucide-react';
-import { get, post } from '@/lib/api';
+import { get, post, put, del } from '@/lib/api';
 import type { Material } from '@/types';
 
 interface MaterialFormData {
@@ -59,7 +60,6 @@ export default function InventarioPage() {
 }
 
 function InventarioContent() {
-  const router = useRouter();
   const [items, setItems] = useState<Material[]>([]);
   const [meta, setMeta] = useState<{ total: number; page: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,9 +69,26 @@ function InventarioContent() {
   const [page, setPage] = useState(1);
   const limit = 10;
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [detailMaterial, setDetailMaterial] = useState<Material | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
 
   const [form, setForm] = useState<MaterialFormData>({
+    codigo: '',
+    descripcion: '',
+    tipo: 'Material',
+    unidad: 'pieza',
+    stockActual: 0,
+    stockMinimo: 10,
+    costoUnitario: 0,
+    moneda: 'MXN',
+    proveedorId: '',
+    notas: '',
+  });
+
+  const [editForm, setEditForm] = useState<MaterialFormData>({
     codigo: '',
     descripcion: '',
     tipo: 'Material',
@@ -156,6 +173,98 @@ function InventarioContent() {
       loadInventario(page, search, categoryFilter);
     } catch (err: any) {
       setError(err?.message || 'Error al crear el material');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openDetailMaterial(m: Material) {
+    setDetailMaterial(m);
+    setShowDetailModal(true);
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailMaterial) return;
+    if (!confirm('¿Está seguro de eliminar este material?')) return;
+    try {
+      setError('');
+      await del(`/api/inventario/materiales/${detailMaterial.id}`);
+      setShowDetailModal(false);
+      setDetailMaterial(null);
+      loadInventario(page, search, categoryFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailMaterial) return;
+    setEditingMaterial(detailMaterial);
+    setEditForm({
+      codigo: detailMaterial.codigo,
+      descripcion: detailMaterial.descripcion,
+      tipo: detailMaterial.tipo,
+      unidad: detailMaterial.unidad,
+      stockActual: Number(detailMaterial.stockActual ?? 0),
+      stockMinimo: Number(detailMaterial.stockMinimo ?? 10),
+      costoUnitario: Number(detailMaterial.costoUnitario ?? 0),
+      moneda: detailMaterial.moneda,
+      proveedorId: '',
+      notas: '',
+    });
+    setShowDetailModal(false);
+    setShowEditModal(true);
+  }
+
+  function openEditFromDetailCard(m: Material) {
+    setEditingMaterial(m);
+    setEditForm({
+      codigo: m.codigo,
+      descripcion: m.descripcion,
+      tipo: m.tipo,
+      unidad: m.unidad,
+      stockActual: Number(m.stockActual ?? 0),
+      stockMinimo: Number(m.stockMinimo ?? 10),
+      costoUnitario: Number(m.costoUnitario ?? 0),
+      moneda: m.moneda,
+      proveedorId: '',
+      notas: '',
+    });
+    setShowEditModal(true);
+  }
+
+  async function handleDeleteCard(id: string) {
+    if (!confirm('¿Está seguro de eliminar este material?')) return;
+    try {
+      setError('');
+      await del(`/api/inventario/materiales/${id}`);
+      loadInventario(page, search, categoryFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingMaterial) return;
+    setSaving(true);
+    setError('');
+    try {
+      await put(`/api/inventario/materiales/${editingMaterial.id}`, {
+        descripcion: editForm.descripcion,
+        tipo: editForm.tipo,
+        unidad: editForm.unidad,
+        stockActual: Number(editForm.stockActual),
+        stockMinimo: Number(editForm.stockMinimo),
+        costoUnitario: Number(editForm.costoUnitario),
+        moneda: editForm.moneda,
+        notas: editForm.notas || undefined,
+      });
+      setShowEditModal(false);
+      setEditingMaterial(null);
+      loadInventario(page, search, categoryFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar el material');
     } finally {
       setSaving(false);
     }
@@ -276,7 +385,7 @@ function InventarioContent() {
       </div>
 
       {/* Error State */}
-      {error && !showModal && (
+      {error && !showModal && !showEditModal && !showDetailModal && (
         <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
@@ -315,7 +424,8 @@ function InventarioContent() {
             return (
               <div
                 key={m.id}
-                className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+                onClick={() => openDetailMaterial(m)}
+                className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between gap-3">
@@ -331,13 +441,10 @@ function InventarioContent() {
                     </div>
                     <div className="min-w-0">
                       <h3 className="truncate text-sm font-semibold text-foreground">{m.descripcion}</h3>
-                      <button
-                        onClick={() => router.push(`/inventario/${m.id}`)}
-                        className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none"
-                      >
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Hash className="h-3 w-3 text-muted-foreground" />
                         {m.codigo}
-                      </button>
+                      </p>
                     </div>
                   </div>
                   <Badge variant={status.variant}>
@@ -372,20 +479,32 @@ function InventarioContent() {
 
                 {/* Card Footer */}
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(m.createdAt).toLocaleDateString('es-MX')}
-                    </span>
-                  </div>
+                  <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => router.push(`/inventario/${m.id}`)}
-                      title="Ver material"
+                      onClick={(e) => { e.stopPropagation(); openDetailMaterial(m); }}
+                      title="Ver detalle"
                     >
                       <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(e) => { e.stopPropagation(); openEditFromDetailCard(m); }}
+                      title="Editar material"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteCard(m.id); }}
+                      title="Eliminar material"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -587,6 +706,248 @@ function InventarioContent() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Material Modal */}
+      {showEditModal && editingMaterial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Editar Material {editingMaterial.codigo}</h2>
+              <button
+                onClick={() => { setShowEditModal(false); setEditingMaterial(null); }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Descripción *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.descripcion}
+                  onChange={(e) => setEditForm({ ...editForm, descripcion: e.target.value })}
+                  className="input-base"
+                  placeholder="Descripción del material"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Tipo
+                  </label>
+                  <select
+                    value={editForm.tipo}
+                    onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="Material">Material</option>
+                    <option value="Producto">Producto</option>
+                    <option value="Servicio">Servicio</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Unidad
+                  </label>
+                  <select
+                    value={editForm.unidad}
+                    onChange={(e) => setEditForm({ ...editForm, unidad: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="pieza">Pieza</option>
+                    <option value="kg">Kg</option>
+                    <option value="m">Metro</option>
+                    <option value="litro">Litro</option>
+                    <option value="set">Set</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Moneda
+                  </label>
+                  <select
+                    value={editForm.moneda}
+                    onChange={(e) => setEditForm({ ...editForm, moneda: e.target.value })}
+                    className="input-base"
+                  >
+                    <option value="MXN">MXN - Peso Mexicano</option>
+                    <option value="USD">USD - Dólar Americano</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Stock Actual
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.stockActual}
+                    onChange={(e) => setEditForm({ ...editForm, stockActual: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Stock Mínimo
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.stockMinimo}
+                    onChange={(e) => setEditForm({ ...editForm, stockMinimo: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Costo Unitario
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={editForm.costoUnitario}
+                    onChange={(e) => setEditForm({ ...editForm, costoUnitario: Number(e.target.value) })}
+                    className="input-base"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Notas
+                </label>
+                <textarea
+                  value={editForm.notas}
+                  onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+                  rows={2}
+                  className="input-base resize-none"
+                  placeholder="Observaciones del material"
+                />
+              </div>
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowEditModal(false); setEditingMaterial(null); }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" className="gap-2" disabled={saving}>
+                  {saving ? 'Guardando...' : 'Actualizar Material'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {showDetailModal && detailMaterial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">{detailMaterial.codigo}</h2>
+                <p className="text-xs text-muted-foreground">{detailMaterial.descripcion}</p>
+              </div>
+              <button
+                onClick={() => { setShowDetailModal(false); setDetailMaterial(null); }}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Info Grid */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="section-title">Código</p>
+                  <p className="text-sm text-foreground">{detailMaterial.codigo}</p>
+                </div>
+                <div>
+                  <p className="section-title">Descripción</p>
+                  <p className="text-sm text-foreground">{detailMaterial.descripcion}</p>
+                </div>
+                <div>
+                  <p className="section-title">Tipo</p>
+                  <Badge variant="outline">{detailMaterial.tipo}</Badge>
+                </div>
+                <div>
+                  <p className="section-title">Unidad</p>
+                  <p className="text-sm text-foreground">{detailMaterial.unidad}</p>
+                </div>
+                <div>
+                  <p className="section-title">Stock</p>
+                  <p className="text-sm font-semibold text-foreground">{Number(detailMaterial.stockActual ?? 0).toLocaleString('es-MX')}</p>
+                </div>
+                <div>
+                  <p className="section-title">Stock Mínimo</p>
+                  <p className="text-sm text-foreground">{Number(detailMaterial.stockMinimo ?? 10).toLocaleString('es-MX')}</p>
+                </div>
+                <div>
+                  <p className="section-title">Costo Unitario</p>
+                  <p className="text-sm text-foreground">{formatCurrency(detailMaterial.costoUnitario ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="section-title">Moneda</p>
+                  <p className="text-sm text-foreground">{detailMaterial.moneda}</p>
+                </div>
+                <div>
+                  <p className="section-title">Estatus</p>
+                  {(() => {
+                    const status = getStockStatus(Number(detailMaterial.stockActual ?? 0), Number(detailMaterial.stockMinimo ?? 10));
+                    return (
+                      <Badge variant={status.variant}>
+                        <status.icon className="mr-1 h-3 w-3" />
+                        {status.label}
+                      </Badge>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openEditFromDetail}
+                  className="gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteFromDetail}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -9,14 +9,16 @@ import type { Proveedor } from '@/types';
 import {
   Search,
   Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  X,
   Factory,
   Truck,
   Package,
   AlertCircle,
   Inbox,
   Edit3,
-  Trash2,
-  X,
   Users,
   Phone,
   Mail,
@@ -55,6 +57,7 @@ interface ProveedorForm {
   diasCredito: number;
   monedaPref: string;
   activo: boolean;
+  notas: string;
 }
 
 const emptyForm: ProveedorForm = {
@@ -72,6 +75,7 @@ const emptyForm: ProveedorForm = {
   diasCredito: 30,
   monedaPref: 'MXN',
   activo: true,
+  notas: '',
 };
 
 const VERSION = '0.1.0';
@@ -209,7 +213,9 @@ function ProveedoresContent() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [editing, setEditing] = useState<Proveedor | null>(null);
+  const [detailProveedor, setDetailProveedor] = useState<Proveedor | null>(null);
   const [form, setForm] = useState<ProveedorForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
@@ -242,7 +248,7 @@ function ProveedoresContent() {
 
   function flashSuccess(msg: string) {
     setSuccess(msg);
-    setTimeout(() => setSuccess(msg), 3000);
+    setTimeout(() => setSuccess(''), 3000);
   }
 
   function handleSearch() {
@@ -280,6 +286,7 @@ function ProveedoresContent() {
       diasCredito: p.diasCredito || 30,
       monedaPref: p.monedaPref || 'MXN',
       activo: p.activo !== false,
+      notas: p.notas || '',
     });
     setError('');
     setShowModal(true);
@@ -328,6 +335,52 @@ function ProveedoresContent() {
     } catch (err: any) {
       setError(err?.message || 'Error al eliminar el proveedor');
     }
+  }
+
+  // Detail modal functions
+  function openDetailCard(p: Proveedor) {
+    setDetailProveedor(p);
+    setShowDetailModal(true);
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailProveedor) return;
+    if (!confirm('¿Está seguro de eliminar este proveedor? Esta acción no se puede deshacer.')) return;
+    try {
+      setError('');
+      await del(`/api/proveedores/${detailProveedor.id}`);
+      setShowDetailModal(false);
+      setDetailProveedor(null);
+      flashSuccess('Proveedor eliminado correctamente');
+      loadProveedores(page, search, filterStatus);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar el proveedor');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailProveedor) return;
+    setEditing(detailProveedor);
+    setForm({
+      codigo: detailProveedor.codigo,
+      razonSocial: detailProveedor.razonSocial,
+      rfc: detailProveedor.rfc || '',
+      contacto: detailProveedor.contacto || '',
+      email: detailProveedor.email || '',
+      telefono: detailProveedor.telefono || '',
+      direccion: detailProveedor.direccion || '',
+      ciudad: detailProveedor.ciudad || '',
+      estado: detailProveedor.estado || '',
+      codigoPostal: detailProveedor.codigoPostal || '',
+      pais: detailProveedor.pais || 'México',
+      diasCredito: detailProveedor.diasCredito || 30,
+      monedaPref: detailProveedor.monedaPref || 'MXN',
+      activo: detailProveedor.activo !== false,
+      notas: detailProveedor.notas || '',
+    });
+    setError('');
+    setShowDetailModal(false);
+    setShowModal(true);
   }
 
   // Stats calculations
@@ -449,7 +502,8 @@ function ProveedoresContent() {
           {proveedores.map((p) => (
             <div
               key={p.id}
-              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              onClick={() => openDetailCard(p)}
+              className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
@@ -460,13 +514,7 @@ function ProveedoresContent() {
                     <Factory className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <button
-                      onClick={() => openEdit(p)}
-                      className="truncate text-sm font-semibold text-foreground hover:text-brand transition-colors text-left"
-                      title="Editar proveedor"
-                    >
-                      {p.razonSocial}
-                    </button>
+                    <h3 className="truncate text-sm font-semibold text-foreground">{p.razonSocial}</h3>
                     <p className="text-xs text-muted-foreground">{p.codigo}</p>
                   </div>
                 </div>
@@ -519,29 +567,28 @@ function ProveedoresContent() {
 
               {/* Card Footer */}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <ShoppingCart className="h-3 w-3" />
-                    {p._count?.ordenesCompraProveedor ?? 0} ord.
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(p.createdAt).toLocaleDateString('es-MX')}
-                  </span>
-                </div>
+                <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => openEdit(p)}
-                    title="Editar proveedor"
+                    onClick={(e) => { e.stopPropagation(); openDetailCard(p); }}
+                    title="Ver detalle"
                   >
-                    <Edit3 className="h-3.5 w-3.5" />
+                    <Eye className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => handleDelete(p.id)}
+                    onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+                    title="Editar proveedor"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
                     title="Eliminar proveedor"
                     className="text-danger hover:text-danger"
                   >
@@ -587,6 +634,136 @@ function ProveedoresContent() {
           © {new Date().getFullYear()} AMD México Operations ERP · v{VERSION}
         </p>
       </footer>
+
+      {/* Detail Modal */}
+      {showDetailModal && detailProveedor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">Detalle del Proveedor</h2>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Razón Social */}
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Razón Social</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{detailProveedor.razonSocial}</p>
+              </div>
+
+              {/* Código */}
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Código</p>
+                <p className="mt-1 text-sm text-foreground">{detailProveedor.codigo}</p>
+              </div>
+
+              {/* Contacto */}
+              {detailProveedor.contacto && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Contacto</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    {detailProveedor.contacto}
+                  </p>
+                </div>
+              )}
+
+              {/* Email */}
+              {detailProveedor.email && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Email</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    {detailProveedor.email}
+                  </p>
+                </div>
+              )}
+
+              {/* Teléfono */}
+              {detailProveedor.telefono && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Teléfono</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    {detailProveedor.telefono}
+                  </p>
+                </div>
+              )}
+
+              {/* Ciudad */}
+              {detailProveedor.ciudad && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Ciudad</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-foreground">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    {detailProveedor.ciudad}
+                  </p>
+                </div>
+              )}
+
+              {/* Estado */}
+              {detailProveedor.estado && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Estado</p>
+                  <p className="mt-1 text-sm text-foreground">{detailProveedor.estado}</p>
+                </div>
+              )}
+
+              {/* Moneda Preferida */}
+              {detailProveedor.monedaPref && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Moneda Preferida</p>
+                  <Badge variant="outline" className="mt-1">{detailProveedor.monedaPref}</Badge>
+                </div>
+              )}
+
+              {/* Notas */}
+              {detailProveedor.notas && (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Notas</p>
+                  <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{detailProveedor.notas}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDetailModal(false)}
+              >
+                Cerrar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 text-danger hover:text-danger"
+                onClick={handleDeleteFromDetail}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Eliminar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2"
+                onClick={openEditFromDetail}
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Editar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (
@@ -785,6 +962,19 @@ function ProveedoresContent() {
                 <span className="text-sm font-medium text-foreground">Activo</span>
               </label>
             </div>
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Notas
+            </label>
+            <textarea
+              value={form.notas || ''}
+              onChange={(e) => updateForm('notas', e.target.value)}
+              rows={3}
+              className="input-base resize-none"
+            />
           </div>
 
           {/* Form Error */}

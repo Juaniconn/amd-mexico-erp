@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -25,6 +24,7 @@ import {
   Loader2,
   ShieldAlert,
   User,
+  ClipboardList,
 } from 'lucide-react';
 import { get, post, put, del } from '@/lib/api';
 
@@ -148,6 +148,153 @@ function EmptyState({ message = 'No hay registros de calidad', submessage = 'Agr
   );
 }
 
+function DetailModal({
+  item,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  item: CalidadItem;
+  onClose: () => void;
+  onEdit: (item: CalidadItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  function getInspectorName(i: CalidadItem) {
+    if (i.inspector) {
+      return `${i.inspector.nombre} ${i.inspector.apellido}`;
+    }
+    return '—';
+  }
+
+  function getOperacionProceso(i: CalidadItem) {
+    if (i.operacion) {
+      return i.operacion.proceso || i.operacion.nombre || 'Sin nombre';
+    }
+    return 'Sin operación';
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+        {/* Header */}
+        <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+              item.resultado === 'aprobado' ? 'bg-success/10 text-success' :
+              item.resultado === 'rechazado' ? 'bg-destructive/10 text-destructive' :
+              item.resultado === 'rework' ? 'bg-warning/10 text-warning' :
+              'bg-muted text-muted-foreground'
+            }`}>
+              <ClipboardCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">{item.ordenTrabajoId || 'Sin orden'}</h2>
+              <p className="text-xs text-muted-foreground">ID: {item.id.slice(0, 8)}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Detail Fields */}
+        <div className="space-y-4">
+          {/* Orden de Trabajo */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Orden de Trabajo</p>
+            <p className="flex items-center gap-2 text-sm text-foreground">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              {item.ordenTrabajoId || '—'}
+            </p>
+          </div>
+
+          {/* Inspector */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Inspector</p>
+            <p className="flex items-center gap-2 text-sm text-foreground">
+              <User className="h-4 w-4 text-muted-foreground" />
+              {getInspectorName(item)}
+            </p>
+          </div>
+
+          {/* Resultado */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Resultado</p>
+            <div className="mt-1">
+              <Badge variant={getResultadoBadgeVariant(item.resultado)}>
+                {getResultadoLabel(item.resultado)}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Defectos */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Defectos</p>
+            <p className="flex items-start gap-2 text-sm text-foreground">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              {item.defectos || 'Sin defectos registrados'}
+            </p>
+          </div>
+
+          {/* Observaciones */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Observaciones</p>
+            <p className="flex items-start gap-2 text-sm text-foreground">
+              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              {item.observaciones || 'Sin observaciones'}
+            </p>
+          </div>
+
+          {/* Operación / Proceso */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Operación / Proceso</p>
+            <p className="flex items-center gap-2 text-sm text-foreground">
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
+              {getOperacionProceso(item)}
+            </p>
+          </div>
+
+          {/* Fecha */}
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">Fecha</p>
+            <p className="flex items-center gap-2 text-sm text-foreground">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              {formatDate(item.createdAt)}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(item)}
+            className="gap-2"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => onDelete(item.id)}
+            className="gap-2"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Eliminar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page Component ────────────────────────────────────
 
 export default function CalidadPage() {
@@ -171,7 +318,9 @@ function CalidadContent() {
   const [limit] = useState(10);
 
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [editing, setEditing] = useState<CalidadItem | null>(null);
+  const [detailItem, setDetailItem] = useState<CalidadItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [operaciones, setOperaciones] = useState<Operacion[]>([]);
 
@@ -255,6 +404,40 @@ function CalidadContent() {
       defectos: item.defectos || '',
       observaciones: item.observaciones || '',
     });
+    setShowModal(true);
+  }
+
+  function openDetailCard(item: CalidadItem) {
+    setDetailItem(item);
+    setShowDetailModal(true);
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailItem) return;
+    if (!confirm('¿Está seguro de eliminar este registro de calidad?')) return;
+    try {
+      setError('');
+      await del(`/api/calidad/${detailItem.id}`);
+      setShowDetailModal(false);
+      setDetailItem(null);
+      loadData(page, search, resultadoFilter);
+      setSuccess('Registro eliminado correctamente');
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar el registro');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailItem) return;
+    setEditing(detailItem);
+    setForm({
+      operacionId: detailItem.operacionId || '',
+      ordenTrabajoId: detailItem.ordenTrabajoId || '',
+      resultado: detailItem.resultado || 'aprobado',
+      defectos: detailItem.defectos || '',
+      observaciones: detailItem.observaciones || '',
+    });
+    setShowDetailModal(false);
     setShowModal(true);
   }
 
@@ -353,7 +536,7 @@ function CalidadContent() {
       </div>
 
       {/* Success Message */}
-      {success && !showModal && (
+      {success && !showModal && !showDetailModal && (
         <div className="flex items-center gap-3 rounded-xl border border-success/20 bg-success-muted px-4 py-3 text-sm text-success">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
           <span>{success}</span>
@@ -452,7 +635,7 @@ function CalidadContent() {
       </div>
 
       {/* Error State */}
-      {error && !showModal && (
+      {error && !showModal && !showDetailModal && (
         <ErrorState message={error} onRetry={() => loadData(page, search, resultadoFilter)} />
       )}
 
@@ -482,7 +665,8 @@ function CalidadContent() {
           {items.map((item) => (
             <div
               key={item.id}
-              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              onClick={() => openDetailCard(item)}
+              className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
@@ -533,25 +717,20 @@ function CalidadContent() {
 
               {/* Card Footer */}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {formatDate(item.createdAt)}
-                  </span>
-                </div>
+                <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => openEdit(item)}
-                    title="Ver registro"
+                    onClick={(e) => { e.stopPropagation(); openDetailCard(item); }}
+                    title="Ver detalle"
                   >
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => openEdit(item)}
+                    onClick={(e) => { e.stopPropagation(); openEdit(item); }}
                     title="Editar registro"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -559,7 +738,7 @@ function CalidadContent() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => handleDelete(item.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
                     title="Eliminar registro"
                     className="text-danger hover:text-danger"
                   >
@@ -609,123 +788,130 @@ function CalidadContent() {
         </p>
       </footer>
 
+      {/* Detail Modal */}
+      {showDetailModal && detailItem && (
+        <DetailModal
+          item={detailItem}
+          onClose={() => setShowDetailModal(false)}
+          onEdit={openEditFromDetail}
+          onDelete={handleDeleteFromDetail}
+        />
+      )}
+
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <CardHeader className="flex-row items-center justify-between space-y-0 border-b pb-4">
-              <CardTitle>
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-foreground">
                 {editing ? 'Editar Registro de Calidad' : 'Nuevo Registro de Calidad'}
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              </h2>
+              <button
                 onClick={() => setShowModal(false)}
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {!editing && (
-                  <div className="space-y-1.5">
-                    <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Operación *
-                    </label>
-                    <div className="relative">
-                      <ClipboardCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <select
-                        required
-                        value={form.operacionId}
-                        onChange={(e) => setForm({ ...form, operacionId: e.target.value })}
-                        className="input-base appearance-none pl-10"
-                      >
-                        <option value="">Seleccionar operación...</option>
-                        {operaciones.map((op) => (
-                          <option key={op.id} value={op.id}>
-                            {op.proceso || op.nombre || op.id} — {op.wo?.piezaNombre || op.maquina?.nombre || ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {!editing && (
                 <div className="space-y-1.5">
                   <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Resultado *
+                    Operación *
                   </label>
                   <div className="relative">
-                    <ListChecks className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <ClipboardCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <select
                       required
-                      value={form.resultado}
-                      onChange={(e) => setForm({ ...form, resultado: e.target.value })}
+                      value={form.operacionId}
+                      onChange={(e) => setForm({ ...form, operacionId: e.target.value })}
                       className="input-base appearance-none pl-10"
                     >
-                      {RESULTADOS.map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
+                      <option value="">Seleccionar operación...</option>
+                      {operaciones.map((op) => (
+                        <option key={op.id} value={op.id}>
+                          {op.proceso || op.nombre || op.id} — {op.wo?.piezaNombre || op.maquina?.nombre || ''}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
+              )}
 
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Defectos
-                  </label>
-                  <div className="relative">
-                    <AlertCircle className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      value={form.defectos}
-                      onChange={(e) => setForm({ ...form, defectos: e.target.value })}
-                      maxLength={500}
-                      placeholder="Describa los defectos encontrados..."
-                      className="input-base pl-10"
-                    />
-                  </div>
+              <div className="space-y-1.5">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Resultado *
+                </label>
+                <div className="relative">
+                  <ListChecks className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <select
+                    required
+                    value={form.resultado}
+                    onChange={(e) => setForm({ ...form, resultado: e.target.value })}
+                    className="input-base appearance-none pl-10"
+                  >
+                    {RESULTADOS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Observaciones
-                  </label>
-                  <textarea
-                    value={form.observaciones}
-                    onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
-                    rows={3}
-                    maxLength={1000}
-                    placeholder="Observaciones adicionales..."
-                    className="input-base resize-none"
+              <div className="space-y-1.5">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Defectos
+                </label>
+                <div className="relative">
+                  <AlertCircle className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={form.defectos}
+                    onChange={(e) => setForm({ ...form, defectos: e.target.value })}
+                    maxLength={500}
+                    placeholder="Describa los defectos encontrados..."
+                    className="input-base pl-10"
                   />
                 </div>
+              </div>
 
-                {error && (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    {error}
-                  </div>
-                )}
+              <div className="space-y-1.5">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Observaciones
+                </label>
+                <textarea
+                  value={form.observaciones}
+                  onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="Observaciones adicionales..."
+                  className="input-base resize-none"
+                />
+              </div>
 
-                <div className="flex justify-end gap-3 border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" size="sm" loading={submitting} className="gap-2">
-                    {editing ? 'Actualizar' : 'Crear'}
-                  </Button>
+              {error && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  {error}
                 </div>
-              </form>
-            </CardContent>
-          </Card>
+              )}
+
+              <div className="flex justify-end gap-3 border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" size="sm" loading={submitting} className="gap-2">
+                  {editing ? 'Actualizar' : 'Crear'}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
