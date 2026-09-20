@@ -1119,40 +1119,25 @@ function CotizacionesContent() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between border-t border-border pt-4">
+              <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    setDetailCotizacion(null);
-                    router.push(`/cotizaciones/${detailCotizacion.id}`);
-                  }}
+                  onClick={openEditFromDetail}
                   className="gap-2"
                 >
-                  <Eye className="h-4 w-4" />
-                  Ver página completa
+                  <Pencil className="h-4 w-4" />
+                  Editar
                 </Button>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openEditFromDetail}
-                    className="gap-2"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDeleteFromDetail}
-                    className="gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Eliminar
-                  </Button>
-                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteFromDetail}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar
+                </Button>
               </div>
             </div>
           </div>

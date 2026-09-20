@@ -196,7 +196,9 @@ function ClientesContent() {
   const [page, setPage] = useState(1);
 
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [editing, setEditing] = useState<Cliente | null>(null);
+  const [detailCliente, setDetailCliente] = useState<Cliente | null>(null);
 
   const [form, setForm] = useState({
     codigo: '',
@@ -319,6 +321,49 @@ function ClientesContent() {
     }
   }
 
+  function openDetailCard(c: Cliente) {
+    setDetailCliente(c);
+    setShowDetailModal(true);
+  }
+
+  async function handleDeleteFromDetail() {
+    if (!detailCliente) return;
+    if (!confirm('¿Está seguro de eliminar este cliente?')) return;
+    try {
+      setError('');
+      await del(`/api/clientes/${detailCliente.id}`);
+      setShowDetailModal(false);
+      setDetailCliente(null);
+      loadClientes(page, search);
+    } catch (err: any) {
+      setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  function openEditFromDetail() {
+    if (!detailCliente) return;
+    setEditing(detailCliente);
+    setForm({
+      codigo: detailCliente.codigo,
+      razonSocial: detailCliente.razonSocial,
+      rfc: detailCliente.rfc || '',
+      contacto: detailCliente.contacto || '',
+      email: detailCliente.email || '',
+      telefono: detailCliente.telefono || '',
+      direccion: detailCliente.direccion || '',
+      ciudad: detailCliente.ciudad || '',
+      estado: detailCliente.estado || '',
+      codigoPostal: detailCliente.codigoPostal || '',
+      pais: detailCliente.pais || 'México',
+      creditoLimite: detailCliente.creditoLimite ? String(detailCliente.creditoLimite) : '',
+      diasCredito: detailCliente.diasCredito || 30,
+      monedaPref: detailCliente.monedaPref || 'MXN',
+      notas: detailCliente.notas || '',
+    });
+    setShowDetailModal(false);
+    setShowModal(true);
+  }
+
   // Stats calculations
   const totalClientes = meta?.total ?? clientes.length;
   const activos = clientes.filter((c) => c.activo !== false).length;
@@ -430,7 +475,8 @@ function ClientesContent() {
           {clientes.map((c) => (
             <div
               key={c.id}
-              className="group rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
+              onClick={() => openDetailCard(c)}
+              className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
@@ -480,29 +526,20 @@ function ClientesContent() {
 
               {/* Card Footer */}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    {c._count?.cotizaciones ?? 0} cot.
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(c.createdAt).toLocaleDateString('es-MX')}
-                  </span>
-                </div>
+                <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => openEdit(c)}
-                    title="Ver cliente"
+                    onClick={(e) => { e.stopPropagation(); openDetailCard(c); }}
+                    title="Ver detalle"
                   >
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => openEdit(c)}
+                    onClick={(e) => { e.stopPropagation(); openEditFromDetail(); }}
                     title="Editar cliente"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -510,7 +547,7 @@ function ClientesContent() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => handleDelete(c.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                     title="Eliminar cliente"
                     className="text-danger hover:text-danger"
                   >
