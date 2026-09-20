@@ -46,6 +46,7 @@ const modules = [
   { section: 'Calidad', items: [
     { href: '/calidad', icon: CheckCircle, label: 'Calidad' },
     { href: '/reportes', icon: BarChart3, label: 'Reportes' },
+    { href: '/facturacion', icon: FileText, label: 'Facturación' },
   ]},
   { section: 'Sistema', items: [
     { href: '/usuarios', icon: Shield, label: 'Usuarios' },

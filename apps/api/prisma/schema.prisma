@@ -125,6 +125,7 @@ model Usuario {
   ingenieriaProyectosCreados IngenieriaProyecto[] @relation("IngenieriaCreador")
   ingenieriaPlanosSubidos IngenieriaPlano[] @relation("PlanoSubidoPor")
   ingenieriaProcesosOperador IngenieriaProceso[] @relation("ProcesoOperador")
+  facturas      Factura[] @relation("FacturaCreador")
 
   @@map("usuarios")
 }
@@ -155,6 +156,7 @@ model Sucursal {
   transferenciasOrigen Transferencia[] @relation("TransferenciaOrigen")
   transferenciasDestino Transferencia[] @relation("TransferenciaDestino")
   ingenieriaProyectos IngenieriaProyecto[]
+  facturas      Factura[]
 
   @@map("sucursales")
 }
@@ -186,6 +188,7 @@ model Cliente {
   cotizaciones    Cotizacion[]
   ordenesCompra   OrdenCompra[]
   ingenieriaProyectos IngenieriaProyecto[]
+  facturas        Factura[]
 
   @@map("clientes")
 }
@@ -418,8 +421,42 @@ model OrdenTrabajo {
   operaciones     Operacion[]
   inspecciones    ControlCalidad[]
   partes          ParteOT[]
+  facturas        Factura[]
 
   @@map("ordenes_trabajo")
+}
+
+model Factura {
+  id              String   @id @default(uuid())
+  folio           String   @unique
+  otId            String   @map("ot_id")
+  clienteId       String   @map("cliente_id")
+  sucursalId      String?  @map("sucursal_id")
+  moneda          TipoCambio @default(MXN)
+  tipoCambio      Decimal? @map("tipo_cambio") @db.Decimal(10, 6)
+  subtotal        Decimal  @default(0) @db.Decimal(12, 2)
+  iva             Decimal  @default(0) @db.Decimal(12, 2)
+  total           Decimal  @default(0) @db.Decimal(12, 2)
+  estatus         EstatusFactura @default(PENDIENTE)
+  fechaFactura    DateTime? @map("fecha_factura")
+  notas           String?
+  creadoPor       String?  @map("creado_por")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  ot              OrdenTrabajo @relation(fields: [otId], references: [id])
+  cliente         Cliente     @relation(fields: [clienteId], references: [id])
+  sucursal         Sucursal?   @relation(fields: [sucursalId], references: [id])
+  creador         Usuario?    @relation("FacturaCreador", fields: [creadoPor], references: [id])
+
+  @@map("facturas")
+}
+
+enum EstatusFactura {
+  PENDIENTE
+  FACTURADA
+  CANCELADA
 }
 
 model ParteOT {

@@ -29,6 +29,28 @@ export interface ParteOT {
   maquina?: { id: string; codigo: string; nombre: string };
 }
 
+export interface Factura {
+  id: string;
+  folio: string;
+  otId: string;
+  clienteId: string;
+  sucursalId?: string;
+  moneda: string;
+  tipoCambio?: number;
+  subtotal: number;
+  iva: number;
+  total: number;
+  estatus: string;
+  fechaFactura?: string;
+  notas?: string;
+  creadoPor?: string;
+  createdAt: string;
+  updatedAt: string;
+  ot?: { id: string; folio: string; estatus: string };
+  cliente?: { id: string; razonSocial: string };
+  sucursal?: { id: string; nombre: string };
+}
+
 class ApiError extends Error {
   status: number;
   data: any;
