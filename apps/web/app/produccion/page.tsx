@@ -19,6 +19,7 @@ import {
   CalendarDays,
   Timer,
   FileText,
+  Package,
 } from 'lucide-react';
 import { get, post, patch, del, OrdenTrabajo } from '@/lib/api';
 
@@ -278,6 +279,21 @@ function ProduccionContent() {
       loadOrdenes(page, search, estatusFilter);
     } catch (err: any) {
       setError(err?.message || 'Error al eliminar');
+    }
+  }
+
+  async function handleDescontarMateriales() {
+    if (!detailOT) return;
+    if (!confirm('¿Está seguro de descontar los materiales del inventario para esta OT?')) return;
+    try {
+      setError('');
+      const res = await post(`/api/ordenes-trabajo/${detailOT.id}/descontar-materiales`, {});
+      alert(`Materiales descontados: ${res.materialesDescontados}\n${res.detalle.map((d: any) => `• ${d.materialId}: ${d.stockAnterior} → ${d.stockNuevo}`).join('\n')}`);
+      setShowDetailModal(false);
+      setDetailOT(null);
+      loadOrdenes(page, search, estatusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al descontar materiales');
     }
   }
 
@@ -812,6 +828,17 @@ function ProduccionContent() {
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                {detailOT.estatus === 'PENDIENTE' && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleDescontarMateriales}
+                    className="gap-2"
+                  >
+                    <Package className="h-4 w-4" />
+                    Descontar Materiales
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

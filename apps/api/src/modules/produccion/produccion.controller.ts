@@ -85,6 +85,12 @@ export class ProduccionController {
     return this.produccionService.actualizarEstatusParte(id, dto);
   }
 
+  @Post('ordenes-trabajo/:id/descontar-materiales')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async descontarMateriales(@Param('id') id: string) {
+    return this.produccionService.descontarMaterialesOT(id);
+  }
+
   @Get('partes-ot/orden-trabajo/:id')
   @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
   async findPartesByOT(@Param('id') id: string) {

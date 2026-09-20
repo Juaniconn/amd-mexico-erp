@@ -176,9 +176,56 @@ export class ProduccionService {
       include: {
         operador: { select: { id: true, nombre: true, apellido: true } },
         maquina: { select: { id: true, codigo: true, nombre: true } },
+        material: { select: { id: true, codigo: true, descripcion: true, stockActual: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  async descontarMaterialesOT(otId: string) {
+    const ot = await this.prisma.ordenTrabajo.findUnique({
+      where: { id: otId },
+      include: {
+        partes: {
+          include: { material: true },
+        },
+      },
+    });
+
+    if (!ot) {
+      throw new Error('Orden de trabajo no encontrada');
+    }
+
+    const resultados: Array<{ parteId: string; materialId: string; cantidad: number; stockAnterior: number; stockNuevo: number }> = [];
+
+    for (const parte of ot.partes) {
+      if (!parte.materialId || !parte.material) continue;
+
+      const material = parte.material;
+      const cantidad = parte.cantidad;
+      const stockAnterior = Number(material.stockActual);
+      const stockNuevo = Math.max(0, stockAnterior - cantidad);
+
+      await this.prisma.material.update({
+        where: { id: material.id },
+        data: { stockActual: stockNuevo },
+      });
+
+      resultados.push({
+        parteId: parte.id,
+        materialId: material.id,
+        cantidad,
+        stockAnterior,
+        stockNuevo,
+      });
+    }
+
+    return {
+      otId,
+      otFolio: ot.folio,
+      materialesDescontados: resultados.length,
+      detalle: resultados,
+    };
   }
 
   async findAllOrdenesTrabajo(page: number = 1, limit: number = 10, search?: string, estatus?: string) {

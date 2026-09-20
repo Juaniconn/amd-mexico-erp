@@ -3,11 +3,10 @@ packages:
   - 'packages/*'
 
 onlyBuiltDependencies:
-  - esbuild
-  - '@nestjs/core'
-  - '@nestjs/platform-express'
-  - prisma
   - '@prisma/client'
-  - bcryptjs
-  - class-validator
-  - class-transformer
+  - 'prisma'
+  - '@nestjs/core'
+  - 'esbuild'
+  - 'unrs-resolver'
+
+dangerouslyAllowAllBuilds: true

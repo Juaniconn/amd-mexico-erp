@@ -275,6 +275,7 @@ model Material {
   // Relaciones
   proveedor       Proveedor? @relation(fields: [proveedorId], references: [id])
   sucursal         Sucursal? @relation(fields: [sucursalId], references: [id])
+  partesOT        ParteOT[]
 
   @@map("materiales")
 }
@@ -432,6 +433,7 @@ model ParteOT {
   estatus           EstatusParteOT @default(PENDIENTE)
   maquinaId         String?  @map("maquina_id")
   operadorId        String?  @map("operador_id")
+  materialId        String?  @map("material_id")
   notas             String?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -440,6 +442,7 @@ model ParteOT {
   ot                OrdenTrabajo @relation(fields: [otId], references: [id], onDelete: Cascade)
   maquina           Maquina?     @relation(fields: [maquinaId], references: [id])
   operador          Usuario?     @relation("ParteOTOperador", fields: [operadorId], references: [id])
+  material          Material?    @relation(fields: [materialId], references: [id])
 
   @@map("partes_ot")
 }
