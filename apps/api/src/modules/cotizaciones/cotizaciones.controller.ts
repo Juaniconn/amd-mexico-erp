@@ -15,11 +15,15 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { ProduccionService } from '../produccion/produccion.service';
 
 @Controller('cotizaciones')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CotizacionesController {
-  constructor(private readonly cotizacionesService: CotizacionesService) {}
+  constructor(
+    private readonly cotizacionesService: CotizacionesService,
+    private readonly produccionService: ProduccionService,
+  ) {}
 
   @Post()
   @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
@@ -58,5 +62,17 @@ export class CotizacionesController {
   @Roles(Role.ADMIN, Role.GERENTE)
   async remove(@Param('id') id: string) {
     return this.cotizacionesService.remove(id);
+  }
+
+  @Post(':id/aprobar')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
+  async aprobarYConvertir(@Param('id') id: string, @Body() body: { responsableId?: string }) {
+    // 1. Cambiar estatus a ACEPTADA
+    await this.cotizacionesService.update(id, { estatus: 'ACEPTADA' } as any);
+    // 2. Convertir a OT
+    return this.produccionService.convertirCotizacionAOrdenTrabajo({
+      cotizacionId: id,
+      responsableId: body.responsableId,
+    });
   }
 }

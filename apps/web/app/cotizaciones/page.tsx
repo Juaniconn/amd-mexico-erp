@@ -245,6 +245,20 @@ function CotizacionesContent() {
     }
   }
 
+  async function handleAprobar() {
+    if (!detailCotizacion) return;
+    if (!confirm('¿Está seguro de aprobar esta cotización? Se convertirá en una Orden de Trabajo.')) return;
+    try {
+      setError('');
+      await post(`/api/cotizaciones/${detailCotizacion.id}/aprobar`, {});
+      setShowDetailModal(false);
+      setDetailCotizacion(null);
+      loadCotizaciones(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al aprobar');
+    }
+  }
+
   function openEditFromDetail() {
     if (!detailCotizacion) return;
     setEditingCotizacion(detailCotizacion);
@@ -1120,6 +1134,17 @@ function CotizacionesContent() {
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                {detailCotizacion.estatus === 'ENVIADA' && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleAprobar}
+                    className="gap-2"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Aprobar y Convertir a OT
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
