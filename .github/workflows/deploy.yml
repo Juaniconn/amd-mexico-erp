@@ -52,8 +52,6 @@ jobs:
           export CI=true
           # Skip interactive “reinstall modules?” prompt from pnpm
           pnpm config set confirmModulesPurge false
-          export CI=true
-          pnpm config set confirmModulesPurge false
           pnpm install --frozen-lockfile
           pnpm --filter api exec prisma generate
           pnpm --filter api build
