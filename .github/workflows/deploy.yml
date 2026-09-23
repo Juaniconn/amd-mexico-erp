@@ -1,21 +1,23 @@
 name: Deploy AMD ERP
 
+# Solo despliega cuando CI en main terminó OK (no en paralelo ni si lint falla).
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [closed]
+
+concurrency:
+  group: deploy-amd-erp-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true || github.event_name == 'push'
+    timeout-minutes: 30
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -23,43 +25,60 @@ jobs:
 
       - name: Test SSH connection
         run: |
-          ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "echo 'SSH OK'; pwd; whoami" || { echo 'SSH FAILED'; exit 1; }
+          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "echo SSH_OK; hostname; whoami"
 
       - name: Deploy to server
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            set -e
-            export PATH="$HOME/.local/bin:$PATH"
-            cd /home/ubuntu/data/projets/amd_web_app
-            
-            # Instalar dependencias con npm (evita problemas de pnpm 12+)
-            npm install --legacy-peer-deps
-            
-            # Descargar imágenes (si no están locales), luego levantar
-            sg docker -c "docker compose -f infra/docker/docker-compose.yml pull --ignore-pull-failures" 2>&1 || true
-            sg docker -c "docker compose -f infra/docker/docker-compose.yml up -d db redis minio"
-            
-            # Esperar a que PostgreSQL esté listo
-            echo "Esperando a que PostgreSQL esté listo..."
-            for i in $(seq 1 30); do
-              if sg docker -c "docker compose -f infra/docker/docker-compose.yml exec db pg_isready -h localhost -p 5432 -U erp -d erp_db" > /dev/null 2>&1; then
-                echo "PostgreSQL listo"
-                break
-              fi
-              sleep 2
-            done
-            
-            # Generar cliente Prisma y ejecutar migraciones (usando npx para evitar PATH issues)
+          ssh -o StrictHostKeyChecking=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "bash -s" << 'EOF'
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          cd /home/ubuntu/data/projets/amd_web_app
+
+          echo "== git status =="
+          git status -sb
+
+          # No pisar trabajo local sin commit en el servidor
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ABORT: el working tree del servidor tiene cambios sin commit."
+            echo "Haz commit/push o limpia el tree antes del auto-deploy."
+            git status --porcelain | head -40
+            exit 1
+          fi
+
+          echo "== pull origin/main =="
+          git fetch origin main
+          git merge --ff-only origin/main
+
+          echo "== docker compose build & up =="
+          COMPOSE="docker compose -f infra/docker/docker-compose.yml"
+          sg docker -c "$COMPOSE pull --ignore-pull-failures" || true
+          sg docker -c "$COMPOSE up -d db redis minio"
+          sg docker -c "$COMPOSE build api web"
+          sg docker -c "$COMPOSE up -d api web"
+
+          echo "== wait postgres =="
+          for i in $(seq 1 30); do
+            if sg docker -c "$COMPOSE exec -T db pg_isready -h localhost -p 5432 -U erp -d erp_db" >/dev/null 2>&1; then
+              echo "PostgreSQL listo"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "== prisma migrate =="
+          # Preferir prisma del contenedor API si existe; fallback host
+          if sg docker -c "$COMPOSE exec -T api npx prisma migrate deploy --schema apps/api/prisma/schema.prisma" 2>/dev/null; then
+            echo "migrate via api container OK"
+          else
             npx prisma generate --schema apps/api/prisma/schema.prisma
             npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
-            
-            # Seed de datos iniciales
-            npx prisma db seed --schema apps/api/prisma/schema.prisma
-            
-            # Verificar contenedores corriendo
-            sg docker -c "docker compose -f infra/docker/docker-compose.yml ps"
-            
-            echo "Deploy OK"
+          fi
+
+          echo "== containers =="
+          sg docker -c "$COMPOSE ps"
+          echo "Deploy OK"
           EOF
