@@ -15,6 +15,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CotizacionesService } from './cotizaciones.service';
 import { CotizacionPaqueteService } from './cotizacion-paquete.service';
+import { CotizacionEstimacionService } from './cotizacion-estimacion.service';
 import { CreateCotizacionDto, UpdateCotizacionDto } from './dto/create-cotizacion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,6 +35,7 @@ export class CotizacionesController {
   constructor(
     private readonly cotizacionesService: CotizacionesService,
     private readonly paqueteService: CotizacionPaqueteService,
+    private readonly estimacionService: CotizacionEstimacionService,
     private readonly produccionService: ProduccionService,
   ) {}
 
@@ -140,6 +142,12 @@ export class CotizacionesController {
   @Roles(Role.ADMIN, Role.GERENTE)
   async remove(@Param('id') id: string) {
     return this.cotizacionesService.remove(id);
+  }
+
+  @Post(':id/estimar-precios')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
+  async estimarPrecios(@Param('id') id: string) {
+    return this.estimacionService.estimarPrecios(id);
   }
 
   @Post(':id/aprobar')

@@ -38,6 +38,7 @@ import {
   Wrench,
   X,
   Plus,
+  Sparkles,
 } from 'lucide-react';
 import { get, put, del, post, ApiError } from '@/lib/api';
 import type { CotizacionWithParts, DetalleCotizacion } from '@/types';
@@ -216,6 +217,37 @@ export default function CotizacionDetallePage() {
       }
     } catch (err: any) {
       setError(err?.message || 'Error al convertir a OT');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleEstimarPrecios = async () => {
+    if (
+      !confirm(
+        'El agente estimará precios (mercado CJ/MX + tarifas taller). ¿Continuar? Deberás revisar antes de enviar al cliente.',
+      )
+    ) {
+      return;
+    }
+    setActionLoading('estimar');
+    setError('');
+    try {
+      const result = await post<{
+        estimacion?: { disclaimer?: string; lineas?: number };
+      }>(`/api/cotizaciones/${id}/estimar-precios`, {});
+      await fetchCotizacion();
+      const n = result?.estimacion?.lineas;
+      alert(
+        result?.estimacion?.disclaimer ||
+          `Estimación lista${n ? ` (${n} líneas)` : ''}. Revisa precios antes de enviar.`,
+      );
+    } catch (err: any) {
+      const msg =
+        err instanceof ApiError
+          ? err.data?.message || err.message
+          : err?.message || 'Error al estimar precios';
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setActionLoading('');
     }
@@ -406,6 +438,20 @@ export default function CotizacionDetallePage() {
                   <Send className="w-4 h-4" />
                 )}
                 {estatus === 'BORRADOR' ? 'Enviar' : 'Reenviar'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleEstimarPrecios}
+                disabled={!!actionLoading}
+                className="gap-2"
+              >
+                {actionLoading === 'estimar' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                Estimar precios IA
               </Button>
               <Button
                 variant="outline"
@@ -687,6 +733,11 @@ export default function CotizacionDetallePage() {
                                   <FileText className="w-3 h-3" />
                                   Plano ligado
                                 </p>
+                              )}
+                              {String(d.notas || '').includes('Estimado IA') && (
+                                <Badge variant="warning" className="mt-1 text-[10px]">
+                                  Estimado IA — revisar
+                                </Badge>
                               )}
                               {d.procesoRequerido && (
                                 <div className="flex items-center gap-1 mt-1">
