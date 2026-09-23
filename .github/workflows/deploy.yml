@@ -25,16 +25,20 @@ jobs:
 
       - name: Test SSH connection
         run: |
-          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o ForwardAgent=no \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "echo SSH_OK; hostname; whoami; cd /home/ubuntu/data/projets/amd_web_app && git rev-parse --short HEAD"
 
       - name: Deploy to server (hot-deploy)
         run: |
-          ssh -o StrictHostKeyChecking=no \
+          ssh -o StrictHostKeyChecking=no -o ForwardAgent=no \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'ENDSSH'
           set -e
           export PATH="$HOME/.local/bin:$PATH"
+          # Evitar que el agent de GitHub Actions se use para git fetch → GitHub
+          unset SSH_AUTH_SOCK
+          unset SSH_AGENT_PID
+
           cd /home/ubuntu/data/projets/amd_web_app
 
           echo "== git =="
