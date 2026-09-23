@@ -60,3 +60,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+        env:
+          # AppModule boots JwtStrategy; CI has no apps/api/.env
+          JWT_SECRET: ci-test-jwt-secret-not-for-production
+          JWT_REFRESH_SECRET: ci-test-jwt-refresh-secret
+          JWT_EXPIRES_IN: 8h
+          JWT_REFRESH_EXPIRES_IN: 7d
