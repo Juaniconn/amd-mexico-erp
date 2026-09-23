@@ -1,9 +1,25 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InventarioService } from '../inventario.service';
 import { PrismaService } from '../../../database/prisma.service';
+import { StockSucursalService } from '../stock-sucursal.service';
 import { CreateMaterialDto } from '../dto/create-material.dto';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+
+const SUCURSAL_PRINCIPAL = {
+  id: 'suc-principal',
+  codigo: 'CJZ',
+  nombre: 'Ciudad Juárez',
+  esPrincipal: true,
+  activo: true,
+};
+
+const mockStockSucursalService = {
+  syncMaterialAggregate: jest.fn().mockResolvedValue(0),
+  ensureRow: jest.fn(),
+  adjust: jest.fn(),
+  getStock: jest.fn(),
+};
 
 // Mock PrismaService
 const mockPrismaService = {
@@ -14,6 +30,17 @@ const mockPrismaService = {
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+  },
+  sucursal: {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+  },
+  stockSucursal: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+    aggregate: jest.fn(),
   },
 };
 
@@ -28,6 +55,10 @@ describe('InventarioService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: StockSucursalService,
+          useValue: mockStockSucursalService,
         },
       ],
     }).compile();
@@ -44,16 +75,33 @@ describe('InventarioService', () => {
       const dto: CreateMaterialDto = {
         codigo: 'MAT-001',
         nombre: 'Tornillo de acero',
+        stockActual: 12,
+        stockMinimo: 2,
       };
 
-      const expectedMaterial = {
+      const created = {
         id: '1',
         codigo: dto.codigo,
         nombre: dto.nombre,
       };
+      const stored = {
+        ...created,
+        stockMinimo: 2,
+        stocks: [
+          {
+            sucursalId: SUCURSAL_PRINCIPAL.id,
+            stockActual: 12,
+            stockMinimo: 2,
+          },
+        ],
+      };
 
-      prisma.material.findUnique.mockResolvedValue(null);
-      prisma.material.create.mockResolvedValue(expectedMaterial as any);
+      prisma.material.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(stored as any);
+      prisma.material.create.mockResolvedValue(created as any);
+      prisma.sucursal.findMany.mockResolvedValue([SUCURSAL_PRINCIPAL] as any);
+      prisma.stockSucursal.create.mockResolvedValue({} as any);
 
       const result = await service.create(dto);
 
@@ -66,7 +114,27 @@ describe('InventarioService', () => {
           nombre: dto.nombre,
         }),
       });
-      expect(result).toEqual(expectedMaterial);
+      expect(prisma.sucursal.findMany).toHaveBeenCalledWith({
+        where: { activo: true },
+      });
+      expect(prisma.stockSucursal.create).toHaveBeenCalledWith({
+        data: {
+          materialId: '1',
+          sucursalId: SUCURSAL_PRINCIPAL.id,
+          stockActual: 12,
+          stockMinimo: 2,
+        },
+      });
+      expect(mockStockSucursalService.syncMaterialAggregate).toHaveBeenCalledWith(
+        prisma,
+        '1',
+      );
+      expect(result).toEqual({
+        ...stored,
+        stockActual: 12,
+        stockMinimo: 2,
+        stockSucursalId: SUCURSAL_PRINCIPAL.id,
+      });
     });
 
     it('debe lanzar ConflictException si el código ya existe', async () => {
@@ -101,14 +169,57 @@ describe('InventarioService', () => {
           page: 1,
           limit: 10,
           totalPages: 1,
+          sucursalId: null,
         },
       });
       expect(prisma.material.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           skip: 0,
           take: 10,
+          include: {
+            stocks: {
+              include: {
+                sucursal: {
+                  select: { id: true, codigo: true, nombre: true },
+                },
+              },
+            },
+          },
         }),
       );
+    });
+
+    it('debe proyectar stock de la sucursal cuando se filtra', async () => {
+      const materiales = [
+        {
+          id: '1',
+          codigo: 'MAT-001',
+          nombre: 'Material 1',
+          stockActual: 99,
+          stockMinimo: 1,
+          stocks: [{ sucursalId: 'suc-2', stockActual: 4, stockMinimo: 3 }],
+        },
+      ];
+
+      prisma.material.findMany.mockResolvedValue(materiales as any);
+      prisma.material.count.mockResolvedValue(1);
+
+      const result = await service.findAll(1, 10, undefined, 'suc-2');
+
+      expect(prisma.material.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { stocks: { where: { sucursalId: 'suc-2' } } },
+        }),
+      );
+      expect(result.data[0]).toEqual(
+        expect.objectContaining({
+          stockActual: 4,
+          stockMinimo: 3,
+          stockSucursalId: 'suc-2',
+          stockTotal: 99,
+        }),
+      );
+      expect(result.meta.sucursalId).toBe('suc-2');
     });
 
     it('debe aplicar filtro de búsqueda cuando se proporciona', async () => {
@@ -145,6 +256,13 @@ describe('InventarioService', () => {
 
       expect(prisma.material.findUnique).toHaveBeenCalledWith({
         where: { id: '1' },
+        include: {
+          stocks: {
+            include: {
+              sucursal: { select: { id: true, codigo: true, nombre: true } },
+            },
+          },
+        },
       });
       expect(result).toEqual(material);
     });

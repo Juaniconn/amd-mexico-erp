@@ -1,9 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ComprasService } from '../compras.service';
 import { PrismaService } from '../../../database/prisma.service';
+import { StockSucursalService } from '../../inventario/stock-sucursal.service';
 import { CreateOrdenCompraDto, CreateDetalleOrdenCompraDto } from '../dto/create-orden-compra.dto';
 import { NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+
+const mockStockSucursalService = {
+  syncMaterialAggregate: jest.fn().mockResolvedValue(0),
+  ensureRow: jest.fn(),
+  adjust: jest.fn().mockResolvedValue({ stockAnterior: 50, stockResultante: 60 }),
+  getStock: jest.fn(),
+};
 
 const PRISMA_CLIENT_VERSION = 'test';
 
@@ -43,6 +51,10 @@ describe('ComprasService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: StockSucursalService,
+          useValue: mockStockSucursalService,
         },
       ],
     }).compile();
@@ -446,11 +458,11 @@ describe('ComprasService', () => {
         id: '1',
         folio: 'OC-2026-0001',
         estatus: 'ENVIADA',
+        sucursalId: 'suc-1',
         detalles: [
           { id: 'd1', materialId: 'mat-1', cantidad: 10 },
         ],
       };
-      const mockMaterial = { id: 'mat-1', stockActual: 50 };
       const mockUpdatedOrden = {
         id: '1',
         estatus: 'RECIBIDA',
@@ -458,19 +470,14 @@ describe('ComprasService', () => {
       };
 
       mockPrismaService.ordenCompra.findUnique.mockResolvedValue(mockOrden as any);
-      mockPrismaService.material.findUnique.mockResolvedValue(mockMaterial as any);
 
       mockPrismaService.$transaction.mockImplementation(async (callback: any) => {
         const tx = {
           ordenCompra: {
             update: jest.fn().mockResolvedValue(mockUpdatedOrden),
           },
-          material: {
-            findUnique: jest.fn().mockResolvedValue(mockMaterial),
-            update: jest.fn().mockResolvedValue({ ...mockMaterial, stockActual: 60 }),
-          },
-          movimientoInventario: {
-            create: jest.fn().mockResolvedValue({}),
+          sucursal: {
+            findFirst: jest.fn(),
           },
         };
         return callback(tx);
@@ -479,6 +486,17 @@ describe('ComprasService', () => {
       const result = await service.cambiarEstatus('1', 'RECIBIDA' as any, 'user-1');
 
       expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockStockSucursalService.adjust).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          materialId: 'mat-1',
+          sucursalId: 'suc-1',
+          cantidad: 10,
+          tipo: 'ENTRADA',
+          documentoRef: 'OC-2026-0001',
+          userId: 'user-1',
+        }),
+      );
       expect(result.estatus).toBe('RECIBIDA');
     });
   });
