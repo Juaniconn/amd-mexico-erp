@@ -3,11 +3,20 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { ComprasModule } from '../compras.module';
 import { PrismaService } from '../../../database/prisma.service';
+import { StockSucursalService } from '../../inventario/stock-sucursal.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Prisma } from '@prisma/client';
 
 const PRISMA_CLIENT_VERSION = 'test';
+const SUCURSAL_ID = '550e8400-e29b-41d4-a716-4466554400bb';
+
+const mockStockSucursalService = {
+  syncMaterialAggregate: jest.fn().mockResolvedValue(0),
+  ensureRow: jest.fn(),
+  adjust: jest.fn().mockResolvedValue({ stockAnterior: 0, stockResultante: 0 }),
+  getStock: jest.fn(),
+};
 
 // Mock PrismaService
 const mockPrismaService = {
@@ -49,11 +58,18 @@ describe('ComprasController (integration)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
+      .overrideProvider(StockSucursalService)
+      .useValue(mockStockSucursalService)
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: any) => {
           const req = context.switchToHttp().getRequest();
-          req.user = { id: 'test-user-id', sub: 'test-user-id', role: 'ADMIN' };
+          req.user = {
+            id: 'test-user-id',
+            sub: 'test-user-id',
+            role: 'ADMIN',
+            sucursalId: SUCURSAL_ID,
+          };
           return true;
         },
       })

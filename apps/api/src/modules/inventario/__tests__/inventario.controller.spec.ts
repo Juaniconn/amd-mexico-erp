@@ -3,9 +3,19 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { InventarioModule } from '../inventario.module';
 import { PrismaService } from '../../../database/prisma.service';
+import { StockSucursalService } from '../stock-sucursal.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { NotFoundException } from '@nestjs/common';
+
+const SUCURSAL_ID = '550e8400-e29b-41d4-a716-4466554400aa';
+
+const mockStockSucursalService = {
+  syncMaterialAggregate: jest.fn().mockResolvedValue(0),
+  ensureRow: jest.fn(),
+  adjust: jest.fn(),
+  getStock: jest.fn(),
+};
 
 // Mock PrismaService
 const mockPrismaService = {
@@ -16,6 +26,13 @@ const mockPrismaService = {
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+  },
+  sucursal: {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+  },
+  stockSucursal: {
+    create: jest.fn(),
   },
   $connect: jest.fn(),
   $disconnect: jest.fn(),
@@ -31,11 +48,19 @@ describe('InventarioController (integration)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
+      .overrideProvider(StockSucursalService)
+      .useValue(mockStockSucursalService)
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: any) => {
           const req = context.switchToHttp().getRequest();
-          req.user = { id: 'test-user-id', sub: 'test-user-id', role: 'ADMIN' };
+          const omitSucursal = req.headers['x-omit-sucursal'] === '1';
+          req.user = {
+            id: 'test-user-id',
+            sub: 'test-user-id',
+            role: 'ADMIN',
+            ...(omitSucursal ? {} : { sucursalId: SUCURSAL_ID }),
+          };
           return true;
         },
       })
@@ -61,7 +86,8 @@ describe('InventarioController (integration)', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    mockStockSucursalService.syncMaterialAggregate.mockResolvedValue(0);
   });
 
   describe('GET /api/inventario/materiales', () => {
@@ -91,11 +117,25 @@ describe('InventarioController (integration)', () => {
         nombre: 'Material de prueba',
       };
 
-      prisma.material.findUnique.mockResolvedValue(null);
-      prisma.material.create.mockResolvedValue({
+      const created = {
         id: 'new-id',
         ...createDto,
-      } as any);
+      };
+      prisma.material.findUnique.mockImplementation(async (args: { where?: { codigo?: string; id?: string } }) => {
+        if (args?.where?.codigo) return null;
+        return {
+          ...created,
+          stockMinimo: 0,
+          stocks: [
+            { sucursalId: SUCURSAL_ID, stockActual: 0, stockMinimo: 0 },
+          ],
+        };
+      });
+      prisma.material.create.mockResolvedValue(created as any);
+      prisma.sucursal.findMany.mockResolvedValue([
+        { id: SUCURSAL_ID, esPrincipal: true, activo: true },
+      ] as any);
+      prisma.stockSucursal.create.mockResolvedValue({} as any);
 
       const response = await request(app.getHttpServer())
         .post('/api/inventario/materiales')
@@ -105,14 +145,14 @@ describe('InventarioController (integration)', () => {
       expect(response.body).toBeDefined();
     });
 
-    it('→ 400 con datos inválidos', async () => {
-      const invalidDto = {
-        codigo: '',
-      };
-
+    it('→ 400 cuando el alta no tiene sucursal', async () => {
       await request(app.getHttpServer())
         .post('/api/inventario/materiales')
-        .send(invalidDto)
+        .set('x-omit-sucursal', '1')
+        .send({
+          codigo: 'MAT-NEW',
+          nombre: 'Material de prueba',
+        })
         .expect(400);
     });
 
@@ -130,6 +170,13 @@ describe('InventarioController (integration)', () => {
   });
 
   describe('PATCH /api/inventario/materiales/:id', () => {
+    it('→ 400 con unidad inválida', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/inventario/materiales/1')
+        .send({ unidad: 'tonelada' })
+        .expect(400);
+    });
+
     it('→ 200 al actualizar un material', async () => {
       prisma.material.update.mockResolvedValue({
         id: '1',
