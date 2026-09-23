@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsEnum, Min, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  IsEnum,
+  Min,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateMaterialDto {
   @IsString()
@@ -9,17 +17,26 @@ export class CreateMaterialDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  descripcion: string;
+  nombre: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
+  @MaxLength(500)
+  descripcion?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(100)
-  tipo: string;
+  categoria?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(20)
-  unidad: string;
+  @IsEnum(['pieza', 'kg', 'm', 'litro', 'set', 'caja', 'par', 'PZA', 'KG', 'M', 'L'])
+  @IsOptional()
+  unidad?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  stockActual?: number;
 
   @IsNumber()
   @IsOptional()
@@ -29,12 +46,12 @@ export class CreateMaterialDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
-  costoUnitario?: number;
+  precioUnitario?: number;
 
   @IsString()
   @IsOptional()
-  @MaxLength(3)
-  moneda?: string;
+  @MaxLength(50)
+  ubicacion?: string;
 
   @IsString()
   @IsOptional()
@@ -46,16 +63,20 @@ export class UpdateMaterialDto {
   @IsString()
   @IsOptional()
   @MaxLength(200)
+  nombre?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
   descripcion?: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(100)
-  tipo?: string;
+  categoria?: string;
 
-  @IsString()
+  @IsEnum(['pieza', 'kg', 'm', 'litro', 'set', 'caja', 'par', 'PZA', 'KG', 'M', 'L'])
   @IsOptional()
-  @MaxLength(20)
   unidad?: string;
 
   @IsNumber()
@@ -66,20 +87,37 @@ export class UpdateMaterialDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
-  costoUnitario?: number;
+  precioUnitario?: number;
 
   @IsString()
   @IsOptional()
-  @MaxLength(3)
-  moneda?: string;
+  @MaxLength(50)
+  ubicacion?: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(500)
   notas?: string;
 
+  @IsOptional()
+  activo?: boolean;
+}
+
+export class CreateMovimientoDto {
+  @IsEnum(['ENTRADA', 'SALIDA', 'AJUSTE'])
+  tipo: string;
+
+  @IsNumber()
+  @Min(0.001)
+  cantidad: number;
+
   @IsString()
   @IsOptional()
-  @IsEnum(['activo', 'inactivo'])
-  estatus?: string;
+  @MaxLength(100)
+  documentoRef?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  notas?: string;
 }

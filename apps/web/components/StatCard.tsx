@@ -1,42 +1,21 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+interface StatCardProps { label: string; value: string | number; iconBg?: string; iconColor?: string; icon?: React.ReactNode; trend?: string; trendUp?: boolean; }
 
-interface StatCardProps {
-  title: string;
-  value: number | string;
-  icon?: React.ReactNode;
-  trend?: number;
-  trendLabel?: string;
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'brand';
-  className?: string;
-}
-
-const variantStyles: Record<string, string> = {
-  default: 'bg-card border border-border',
-  success: 'bg-success-muted/30 border border-success/30',
-  warning: 'bg-warning-muted/30 border border-warning/30',
-  danger: 'bg-danger-muted/30 border border-danger/30',
-  brand: 'bg-brand-muted/20 border border-brand/30',
-};
-
-export function StatCard({ title, value, icon, trend, trendLabel, variant = 'default', className }: StatCardProps) {
+export function StatCard({ label, value, iconBg = 'bg-blue-500/10', iconColor = 'text-blue-400', icon, trend, trendUp }: StatCardProps) {
   return (
-    <div className={cn('card-premium p-5', variantStyles[variant], className)}>
-      <div className="flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="section-title">{title}</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{value}</p>
-          {trend !== undefined && (
-            <p className={cn('mt-1 flex items-center gap-1 text-xs font-medium', trend >= 0 ? 'text-success' : 'text-danger')}>
-              {trend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {trend >= 0 ? '+' : ''}{trend}% {trendLabel || 'vs mes anterior'}
+    <div className="rounded-xl border border-white/[0.06] bg-[#141920] p-4 transition-all duration-200 hover:border-white/[0.12] hover:shadow-lg hover:shadow-black/20">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-gray-500">{label}</p>
+          <p className="mt-1.5 font-mono text-xl font-bold tabular-nums text-white">{value}</p>
+          {trend && (
+            <p className={`mt-1 text-[10px] font-medium ${trendUp ? 'text-emerald-400' : 'text-red-400'}`}>
+              {trendUp ? '↑' : '↓'} {trend}
             </p>
           )}
         </div>
         {icon && (
-          <div className="rounded-lg bg-brand/10 p-2 text-brand shrink-0">
-            {icon}
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg}`}>
+            <span className={iconColor}>{icon}</span>
           </div>
         )}
       </div>
@@ -44,17 +23,6 @@ export function StatCard({ title, value, icon, trend, trendLabel, variant = 'def
   );
 }
 
-interface StatGridProps {
-  children: React.ReactNode;
-  cols?: 2 | 3 | 4;
-}
-
-export function StatGrid({ children, cols = 4 }: StatGridProps) {
-  const colClass = {
-    2: 'grid-cols-1 sm:grid-cols-2',
-    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-    4: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
-  }[cols];
-
-  return <div className={cn('gap-4', colClass)}>{children}</div>;
+export function StatGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">{children}</div>;
 }

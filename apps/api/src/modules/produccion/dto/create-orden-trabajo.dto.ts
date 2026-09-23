@@ -99,6 +99,19 @@ export class UpdateOrdenTrabajoDto {
   @IsOptional()
   @Min(1)
   cantidad?: number;
+
+  @IsString()
+  @IsOptional()
+  @IsEnum(['BAJA', 'MEDIA', 'ALTA', 'URGENTE'])
+  prioridad?: string;
+
+  @IsString()
+  @IsOptional()
+  fechaInicio?: string;
+
+  @IsString()
+  @IsOptional()
+  fechaFinEstimada?: string;
 }
 
 export class UpdateOperacionDto {
@@ -116,4 +129,16 @@ export class UpdateOperacionDto {
   @IsOptional()
   @MaxLength(500)
   notas?: string;
+
+  @IsString()
+  @IsOptional()
+  fechaInicioProgramada?: string;
+
+  @IsString()
+  @IsOptional()
+  fechaFinProgramada?: string;
+
+  @IsUUID()
+  @IsOptional()
+  maquinaId?: string;
 }

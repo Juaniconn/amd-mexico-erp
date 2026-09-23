@@ -34,7 +34,36 @@ export class AuthService {
       data: { ultimoAcceso: new Date() },
     });
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    // Cargar permisos del usuario
+    const permisos = await this.prisma.usuarioPermiso.findMany({
+      where: { usuarioId: user.id },
+    });
+
+    const permisosMap: Record<string, string[]> = {};
+    if (user.role === 'ADMIN') {
+      // Admin tiene todos los permisos
+      permisosMap['*'] = ['*'];
+    } else {
+      for (const p of permisos) {
+        if (p.permitido) {
+          if (!permisosMap[p.modulo]) permisosMap[p.modulo] = [];
+          permisosMap[p.modulo].push(p.accion);
+        }
+      }
+    }
+
+    const userFull = await this.prisma.usuario.findUnique({
+      where: { id: user.id },
+      include: { sucursal: true },
+    });
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      sucursalId: user.sucursalId,
+      permisos: permisosMap,
+    };
 
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: process.env.JWT_EXPIRES_IN || '8h',
@@ -48,10 +77,10 @@ export class AuthService {
       },
     );
 
-    const { passwordHash, ...userWithoutPassword } = user;
+    const { passwordHash, ...userWithoutPassword } = userFull || user;
 
     return {
-      user: userWithoutPassword,
+      user: { ...userWithoutPassword, permisos: permisosMap },
       accessToken,
       refreshToken,
     };
@@ -71,7 +100,24 @@ export class AuthService {
         throw new UnauthorizedException('Token inválido');
       }
 
-      const newPayload = { sub: user.id, email: user.email, role: user.role };
+      // Cargar permisos del usuario
+      const permisos = await this.prisma.usuarioPermiso.findMany({
+        where: { usuarioId: user.id },
+      });
+
+      const permisosMap: Record<string, string[]> = {};
+      if (user.role === 'ADMIN') {
+        permisosMap['*'] = ['*'];
+      } else {
+        for (const p of permisos) {
+          if (p.permitido) {
+            if (!permisosMap[p.modulo]) permisosMap[p.modulo] = [];
+            permisosMap[p.modulo].push(p.accion);
+          }
+        }
+      }
+
+      const newPayload = { sub: user.id, email: user.email, role: user.role, permisos: permisosMap };
 
       const accessToken = this.jwtService.sign(newPayload, {
         expiresIn: process.env.JWT_EXPIRES_IN || '8h',
@@ -104,7 +150,24 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
+    // Cargar permisos
+    const permisos = await this.prisma.usuarioPermiso.findMany({
+      where: { usuarioId: userId },
+    });
+
+    const permisosMap: Record<string, string[]> = {};
+    if (user.role === 'ADMIN') {
+      permisosMap['*'] = ['*'];
+    } else {
+      for (const p of permisos) {
+        if (p.permitido) {
+          if (!permisosMap[p.modulo]) permisosMap[p.modulo] = [];
+          permisosMap[p.modulo].push(p.accion);
+        }
+      }
+    }
+
     const { passwordHash, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return { ...userWithoutPassword, permisos: permisosMap };
   }
 }

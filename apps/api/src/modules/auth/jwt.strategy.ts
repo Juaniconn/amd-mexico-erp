@@ -25,6 +25,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const { passwordHash, ...userWithoutPassword } = user;
 
-    return userWithoutPassword;
+    const rows = await this.prisma.usuarioPermiso.findMany({
+      where: { usuarioId: user.id, permitido: true },
+    });
+    const permisos: Record<string, string[]> = {};
+    if (user.role === 'ADMIN') {
+      permisos['*'] = ['*'];
+    } else {
+      for (const p of rows) {
+        if (!permisos[p.modulo]) permisos[p.modulo] = [];
+        permisos[p.modulo].push(p.accion);
+      }
+    }
+
+    return { ...userWithoutPassword, permisos };
   }
 }

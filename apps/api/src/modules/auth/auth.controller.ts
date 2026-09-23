@@ -12,10 +12,14 @@ import { LoginDto } from './dto/login.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PrismaService } from '../../database/prisma.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Public()
   @Post('login')
@@ -35,5 +39,21 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async getProfile(@CurrentUser() user: any) {
     return this.authService.getProfile(user.id);
+  }
+
+  @Get('sucursales')
+  @UseGuards(JwtAuthGuard)
+  async listSucursales() {
+    return this.prisma.sucursal.findMany({
+      where: { activo: true },
+      orderBy: [{ esPrincipal: 'desc' }, { nombre: 'asc' }],
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        ciudad: true,
+        esPrincipal: true,
+      },
+    });
   }
 }

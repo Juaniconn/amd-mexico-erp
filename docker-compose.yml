@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: amd-erp-api
+    network_mode: host
+    environment:
+      - DATABASE_URL=postgresql://erp:erp_password@127.0.0.1:5432/erp_db
+      - REDIS_URL=redis://127.0.0.1:6379
+      - MINIO_ENDPOINT=127.0.0.1
+      - MINIO_PORT=9000
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+      - JWT_SECRET=Xqqau9...I1oA
+      - JWT_EXPIRES_IN=8h
+      - JWT_REFRESH_SECRET=Y8AazT...7GHA
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - NODE_ENV=production
+      - API_PORT=3001
+      - PORT=3001
+      - HOST_SYSINFO_URL=http://127.0.0.1:3002
+    volumes:
+      - ./apps/api/dist:/app/apps/api/dist
+      - ./apps/api/prisma:/app/apps/api/prisma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/docs').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: /tmp/web-deploy
+      dockerfile: /tmp/Dockerfile.web-final
+    container_name: amd-erp-web
+    network_mode: host
+    environment:
+      - NEXT_PUBLIC_API_URL=https://objects-bugs-epson-landscape.trycloudflare.com
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - ./apps/web/.next:/app/apps/web/.next
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    container_name: amd-erp-db
+    network_mode: host
+    environment:
+      - POSTGRES_USER=erp
+      - POSTGRES_PASSWORD=erp_password
+      - POSTGRES_DB=erp_db
+    volumes:
+      - /data/docker/volumes/pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d erp_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: amd-erp-redis
+    network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-09-13T20-26-02Z
+    container_name: amd-erp-minio
+    network_mode: host
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - /data/docker/volumes/minio:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

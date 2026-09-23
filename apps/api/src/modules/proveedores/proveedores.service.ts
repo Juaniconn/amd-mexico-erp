@@ -93,7 +93,7 @@ export class ProveedoresService {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { ordenesCompraProveedor: true },
+            select: { ordenesCompra: true },
           },
         },
       }),
@@ -115,8 +115,9 @@ export class ProveedoresService {
     const proveedor = await this.prisma.proveedor.findUnique({
       where: { id },
       include: {
-        ordenesCompraProveedor: {
-          include: { ordenCompra: true },
+        ordenesCompra: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
         },
       },
     });
@@ -164,7 +165,7 @@ export class ProveedoresService {
         where: { id },
         include: {
           _count: {
-            select: { ordenesCompraProveedor: true },
+            select: { ordenesCompra: true },
           },
         },
       });
@@ -176,7 +177,7 @@ export class ProveedoresService {
         });
       }
 
-      if (proveedor._count.ordenesCompraProveedor > 0) {
+      if (proveedor._count.ordenesCompra > 0) {
         throw new ConflictException({
           message: 'No se puede eliminar un proveedor con órdenes de compra asociadas',
           statusCode: HttpStatus.CONFLICT,

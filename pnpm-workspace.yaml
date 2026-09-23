@@ -10,3 +10,6 @@ onlyBuiltDependencies:
   - 'unrs-resolver'
 
 dangerouslyAllowAllBuilds: true
+
+minimumReleaseAgeExclude:
+  - supertest@7.3.0

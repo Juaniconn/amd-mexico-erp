@@ -3,6 +3,23 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateControlCalidadDto, UpdateControlCalidadDto } from './dto/create-control-calidad.dto';
 import { Prisma } from '@prisma/client';
 
+const RESULTADO_MAP: Record<string, string> = {
+  aprobado: 'APROBADO',
+  APROBADO: 'APROBADO',
+  rechazado: 'RECHAZADO',
+  RECHAZADO: 'RECHAZADO',
+  rework: 'REWORK',
+  REWORK: 'REWORK',
+  retrabajo: 'REWORK',
+};
+
+function normalizeResultado(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const key = raw.trim();
+  const mapped = RESULTADO_MAP[key] || RESULTADO_MAP[key.toLowerCase()];
+  return mapped || key.toUpperCase();
+}
+
 @Injectable()
 export class CalidadService {
   constructor(private readonly prisma: PrismaService) {}
@@ -13,9 +30,10 @@ export class CalidadService {
       throw new NotFoundException({ message: 'Operación no encontrada', statusCode: HttpStatus.NOT_FOUND });
     }
 
+    const resultado = normalizeResultado(data.resultado);
     const createData: any = {
       operacion: { connect: { id: data.operacionId } },
-      resultado: data.resultado,
+      resultado,
       defectos: data.defectos,
       observaciones: data.observaciones,
     };
@@ -32,8 +50,9 @@ export class CalidadService {
 
   async findAll(page: number = 1, limit: number = 10, search?: string, resultado?: string) {
     const skip = (page - 1) * limit;
+    const resultadoNorm = normalizeResultado(resultado);
     const where: any = {
-      ...(resultado ? { resultado: resultado as any } : {}),
+      ...(resultadoNorm ? { resultado: resultadoNorm as any } : {}),
       ...(search
         ? {
             OR: [
@@ -83,7 +102,7 @@ export class CalidadService {
   async update(id: string, data: UpdateControlCalidadDto) {
     try {
       const updateData: any = {};
-      if (data.resultado) updateData.resultado = data.resultado as any;
+      if (data.resultado) updateData.resultado = normalizeResultado(data.resultado) as any;
       if (data.defectos !== undefined) updateData.defectos = data.defectos;
       if (data.observaciones !== undefined) updateData.observaciones = data.observaciones;
 
@@ -98,8 +117,7 @@ export class CalidadService {
 
   async remove(id: string) {
     try {
-      await this.prisma.controlCalidad.delete({ where: { id } });
-      return { message: 'Registro eliminado correctamente' };
+      return await this.prisma.controlCalidad.delete({ where: { id } });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         throw new NotFoundException({ message: 'Registro de calidad no encontrado', statusCode: HttpStatus.NOT_FOUND });

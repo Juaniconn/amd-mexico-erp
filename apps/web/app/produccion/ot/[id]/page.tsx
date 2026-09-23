@@ -34,8 +34,14 @@ import {
   PackageSearch,
   FileText,
   X,
+  DollarSign,
+  Plus,
+  Trash2,
+  ShoppingCart,
+  Truck,
 } from 'lucide-react';
 import type { OrdenTrabajo, ParteOT, EstatusParteOT } from '@/types';
+import { get, patch, post, del, ApiError } from '@/lib/api';
 
 const ESTATUS_PARTE_LABELS: Record<string, string> = {
   PENDIENTE: 'Pendiente',
@@ -203,20 +209,121 @@ function OrdenTrabajoDetail() {
   const [partes, setPartes] = useState<ParteOT[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [costeo, setCosteo] = useState<any>(null);
+  const [bom, setBom] = useState<any[]>([]);
+  const [materiales, setMateriales] = useState<Array<{ id: string; codigo: string; nombre: string }>>([]);
+  const [bomForm, setBomForm] = useState({ materialId: '', cantidad: '1', unidad: 'PZA' });
+  const [bomSaving, setBomSaving] = useState(false);
+  const [mrpLoading, setMrpLoading] = useState(false);
+  const [bomMsg, setBomMsg] = useState('');
+  const [embLoading, setEmbLoading] = useState(false);
 
   const [showEstatusModal, setShowEstatusModal] = useState(false);
   const [parteSeleccionada, setParteSeleccionada] = useState<ParteOT | null>(null);
   const [nuevoEstatus, setNuevoEstatus] = useState<EstatusParteOT>('PENDIENTE');
   const [actualizandoEstatus, setActualizandoEstatus] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setOt(DEMO_OT);
-      setPartes(DEMO_PARTES);
-      setLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
+  const reloadBomCosteo = useCallback(async () => {
+    const [bomData, costeoData] = await Promise.all([
+      get<any[]>(`/api/ordenes-trabajo/${otId}/bom`).catch(() => []),
+      get(`/api/ordenes-trabajo/${otId}/costeo?overheadPct=15`).catch(() => null),
+    ]);
+    setBom(Array.isArray(bomData) ? bomData : []);
+    setCosteo(costeoData);
   }, [otId]);
+
+  useEffect(() => {
+    const fetchOT = async () => {
+      try {
+        setLoading(true);
+        const [otData, partesData] = await Promise.all([
+          get<OrdenTrabajo>(`/api/ordenes-trabajo/${otId}`),
+          get<ParteOT[]>(`/api/partes-ot/orden-trabajo/${otId}`),
+        ]);
+        setOt(otData);
+        setPartes(partesData);
+        await reloadBomCosteo();
+        const mats = await get<{ data: any[] }>('/api/inventario/materiales?limit=200').catch(() => ({ data: [] }));
+        setMateriales(mats.data || []);
+      } catch (err: any) {
+        if (err instanceof ApiError && err.status === 404) {
+          setError('Orden de trabajo no encontrada');
+        } else {
+          setError(err?.message || 'Error al cargar orden de trabajo');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOT();
+  }, [otId, reloadBomCosteo]);
+
+  async function agregarBom(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bomForm.materialId) return;
+    try {
+      setBomSaving(true);
+      setBomMsg('');
+      await post(`/api/ordenes-trabajo/${otId}/bom`, {
+        materialId: bomForm.materialId,
+        cantidad: parseFloat(bomForm.cantidad) || 1,
+        unidad: bomForm.unidad || 'PZA',
+      });
+      setBomForm({ materialId: '', cantidad: '1', unidad: 'PZA' });
+      await reloadBomCosteo();
+      setBomMsg('Línea BOM agregada');
+    } catch (err: any) {
+      setBomMsg(err?.message || 'No se pudo agregar BOM');
+    } finally {
+      setBomSaving(false);
+    }
+  }
+
+  async function eliminarBom(itemId: string) {
+    try {
+      await del(`/api/ordenes-trabajo/${otId}/bom/${itemId}`);
+      await reloadBomCosteo();
+    } catch (err: any) {
+      setBomMsg(err?.message || 'No se pudo eliminar');
+    }
+  }
+
+  async function generarOcDesdeBom() {
+    try {
+      setMrpLoading(true);
+      setBomMsg('');
+      const filter = localStorage.getItem('sucursalFilter');
+      const userSuc = localStorage.getItem('sucursalId');
+      const sucursalId =
+        filter && filter !== 'all' ? filter : userSuc || undefined;
+      const orden = await post<any>('/api/compras/ordenes/desde-bom-ot', {
+        otId,
+        sucursalId,
+      });
+      setBomMsg(
+        `OC generada: ${orden.folio || orden.id}${orden.mrp?.faltantes ? ` (${orden.mrp.faltantes.length} faltantes)` : ''}`,
+      );
+      if (orden?.id) router.push(`/compras/${orden.id}`);
+    } catch (err: any) {
+      setBomMsg(err?.message || 'No se pudo generar OC desde BOM');
+    } finally {
+      setMrpLoading(false);
+    }
+  }
+
+  async function crearEmbarque() {
+    try {
+      setEmbLoading(true);
+      setBomMsg('');
+      const emb = await post<any>('/api/embarques', { otId });
+      setBomMsg(`Embarque ${emb.folio} creado`);
+      if (emb?.id) router.push('/embarques');
+    } catch (err: any) {
+      setBomMsg(err?.message || 'No se pudo crear embarque');
+    } finally {
+      setEmbLoading(false);
+    }
+  }
 
   const getEstatusIcon = useCallback((estatus: string) => {
     switch (estatus) {
@@ -247,12 +354,13 @@ function OrdenTrabajoDetail() {
     setShowEstatusModal(true);
   }
 
-  function handleActualizarEstatus(e: React.FormEvent) {
+  const handleActualizarEstatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!parteSeleccionada) return;
 
     setActualizandoEstatus(true);
-    setTimeout(() => {
+    try {
+      await patch(`/api/partes-ot/${parteSeleccionada.id}/estatus`, { estatus: nuevoEstatus });
       setPartes((prev) =>
         prev.map((p) =>
           p.id === parteSeleccionada.id ? { ...p, estatus: nuevoEstatus } : p
@@ -260,9 +368,12 @@ function OrdenTrabajoDetail() {
       );
       setShowEstatusModal(false);
       setParteSeleccionada(null);
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar estatus');
+    } finally {
       setActualizandoEstatus(false);
-    }, 500);
-  }
+    }
+  };
 
   const totalPartes = partes.length;
   const partesPendientes = partes.filter((p) => p.estatus === 'PENDIENTE').length;
@@ -301,7 +412,7 @@ function OrdenTrabajoDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -309,12 +420,22 @@ function OrdenTrabajoDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{ot.folio}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl truncate">{ot.folio}</h1>
           <p className="text-sm text-muted-foreground">
             Detalle de orden de trabajo y partes
           </p>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2 w-full sm:w-auto sm:ml-auto"
+          disabled={embLoading}
+          onClick={crearEmbarque}
+        >
+          {embLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}
+          Crear embarque
+        </Button>
       </div>
 
       {/* Información General */}
@@ -392,6 +513,213 @@ function OrdenTrabajoDetail() {
         </CardContent>
       </Card>
 
+      {/* Costeo vs cotizado */}
+      {costeo && (
+        <Card className="card-premium">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Costeo OT vs Cotizado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">Cotizado</p>
+                <p className="text-lg font-semibold">
+                  {costeo.cotizado != null
+                    ? `$${Number(costeo.cotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+                    : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">Material</p>
+                <p className="text-lg font-semibold">
+                  ${Number(costeo.costoMaterial || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                  MO ({Number(costeo.horasReal || 0).toFixed(1)} h)
+                </p>
+                <p className="text-lg font-semibold">
+                  ${Number(costeo.costoManoObra || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">Máquina</p>
+                <p className="text-lg font-semibold">
+                  ${Number(costeo.costoMaquina || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                  Overhead ({Number(costeo.overheadPct || 0)}%)
+                </p>
+                <p className="text-lg font-semibold">
+                  ${Number(costeo.overhead || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">Margen</p>
+                <p
+                  className={`text-lg font-semibold ${
+                    costeo.margen != null && costeo.margen < 0 ? 'text-red-400' : 'text-emerald-400'
+                  }`}
+                >
+                  {costeo.margen != null
+                    ? `$${Number(costeo.margen).toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${Number(costeo.margenPct || 0).toFixed(1)}%)`
+                    : '—'}
+                </p>
+              </div>
+            </div>
+            {costeo.materialDesdeBom && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Costo de material estimado desde BOM (sin salidas kardex ligadas al folio).
+              </p>
+            )}
+            {costeo.sinMovimientosMaterial && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Sin movimientos de salida ni BOM; el costo de material puede quedar en 0.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* BOM */}
+      <Card className="card-premium">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <PackageSearch className="h-5 w-5" />
+            BOM ({bom.length})
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 w-full sm:w-auto"
+            disabled={mrpLoading || bom.length === 0}
+            onClick={generarOcDesdeBom}
+          >
+            {mrpLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShoppingCart className="h-4 w-4" />
+            )}
+            Generar OC desde BOM
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {bomMsg && (
+            <p className="text-sm text-muted-foreground">{bomMsg}</p>
+          )}
+          <form onSubmit={agregarBom} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[200px] flex-1">
+              <label className="text-xs text-muted-foreground">Material</label>
+              <select
+                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={bomForm.materialId}
+                onChange={(e) => setBomForm((f) => ({ ...f, materialId: e.target.value }))}
+                required
+              >
+                <option value="">Seleccionar…</option>
+                {materiales.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.codigo} — {m.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-24">
+              <label className="text-xs text-muted-foreground">Cant.</label>
+              <input
+                type="number"
+                min="0.001"
+                step="any"
+                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={bomForm.cantidad}
+                onChange={(e) => setBomForm((f) => ({ ...f, cantidad: e.target.value }))}
+              />
+            </div>
+            <div className="w-20">
+              <label className="text-xs text-muted-foreground">Unidad</label>
+              <input
+                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={bomForm.unidad}
+                onChange={(e) => setBomForm((f) => ({ ...f, unidad: e.target.value }))}
+              />
+            </div>
+            <Button type="submit" size="sm" className="gap-1" disabled={bomSaving}>
+              {bomSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Agregar
+            </Button>
+          </form>
+          {bom.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin líneas BOM. Agrega materiales requeridos.</p>
+          ) : (
+            <>
+              <div className="space-y-2 md:hidden">
+                {bom.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{item.material?.nombre || '—'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.material?.codigo || '—'} · {Number(item.cantidad)} {item.unidad}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => eliminarBom(item.id)}
+                      aria-label="Eliminar BOM"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <TableContainer>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Material</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                        <TableHead>Unidad</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bom.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.material?.codigo || '—'}</TableCell>
+                          <TableCell>{item.material?.nombre || '—'}</TableCell>
+                          <TableCell>{Number(item.cantidad)}</TableCell>
+                          <TableCell>{item.unidad}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => eliminarBom(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Estadísticas de Partes */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard label="Total Partes" value={totalPartes} />
@@ -409,106 +737,157 @@ function OrdenTrabajoDetail() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <TableContainer>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>No. Parte</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Cantidad</TableHead>
-                  <TableHead>Estatus</TableHead>
-                  <TableHead>Máquina</TableHead>
-                  <TableHead>Operador</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {partes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <Inbox className="mb-2 h-8 w-8 text-muted-foreground/50" />
-                        <p className="text-sm text-muted-foreground">
-                          No hay partes en esta orden de trabajo
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  partes.map((parte) => (
-                    <TableRow key={parte.id}>
-                      <TableCell className="font-mono text-xs font-medium">
+          {partes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Inbox className="mb-2 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                No hay partes en esta orden de trabajo
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {partes.map((parte) => (
+                  <div key={parte.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/produccion/ot/${otId}/parte/${encodeURIComponent(parte.numeroParte || '')}`,
+                          )
+                        }
+                        className="font-mono text-xs font-medium text-brand text-left"
+                      >
                         {parte.numeroParte}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{parte.piezaNombre}</p>
-                          {parte.descripcion && (
-                            <p className="text-xs text-muted-foreground">
-                              {parte.descripcion}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {parte.cantidad} {parte.unidad}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            ESTATUS_PARTE_VARIANTS[parte.estatus] || 'default'
-                          }
-                          className="gap-1.5"
-                        >
-                          {getEstatusIcon(parte.estatus)}
-                          {ESTATUS_PARTE_LABELS[parte.estatus] || parte.estatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {parte.maquina ? (
-                          <span className="text-xs">
-                            <span className="font-medium">
-                              {parte.maquina.codigo}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {' '}
-                              — {parte.maquina.nombre}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {parte.operador
-                          ? `${parte.operador.nombre} ${parte.operador.apellido}`
-                          : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => abrirModalEstatus(parte)}
-                            title="Cambiar estatus"
-                          >
-                            <PlayCircle className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                      </button>
+                      <Badge
+                        variant={ESTATUS_PARTE_VARIANTS[parte.estatus] || 'default'}
+                        className="gap-1 shrink-0"
+                      >
+                        {getEstatusIcon(parte.estatus)}
+                        {ESTATUS_PARTE_LABELS[parte.estatus] || parte.estatus}
+                      </Badge>
+                    </div>
+                    <p className="font-medium text-sm">{parte.piezaNombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {parte.cantidad} {parte.unidad}
+                      {parte.maquina ? ` · ${parte.maquina.codigo}` : ''}
+                      {parte.operador
+                        ? ` · ${parte.operador.nombre} ${parte.operador.apellido}`
+                        : ''}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1"
+                      onClick={() => abrirModalEstatus(parte)}
+                    >
+                      <PlayCircle className="h-3.5 w-3.5" /> Cambiar estatus
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <TableContainer>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>No. Parte</TableHead>
+                        <TableHead>Descripción</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                        <TableHead>Estatus</TableHead>
+                        <TableHead>Máquina</TableHead>
+                        <TableHead>Operador</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {partes.map((parte) => (
+                        <TableRow key={parte.id}>
+                          <TableCell className="font-mono text-xs font-medium">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(
+                                  `/produccion/ot/${otId}/parte/${encodeURIComponent(parte.numeroParte || '')}`,
+                                );
+                              }}
+                              className="text-brand hover:underline"
+                            >
+                              {parte.numeroParte}
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{parte.piezaNombre}</p>
+                              {parte.descripcion && (
+                                <p className="text-xs text-muted-foreground">
+                                  {parte.descripcion}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {parte.cantidad} {parte.unidad}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                ESTATUS_PARTE_VARIANTS[parte.estatus] || 'default'
+                              }
+                              className="gap-1.5"
+                            >
+                              {getEstatusIcon(parte.estatus)}
+                              {ESTATUS_PARTE_LABELS[parte.estatus] || parte.estatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {parte.maquina ? (
+                              <span className="text-xs">
+                                <span className="font-medium">
+                                  {parte.maquina.codigo}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {' '}
+                                  — {parte.maquina.nombre}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {parte.operador
+                              ? `${parte.operador.nombre} ${parte.operador.apellido}`
+                              : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => abrirModalEstatus(parte)}
+                                title="Cambiar estatus"
+                              >
+                                <PlayCircle className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
       {/* Modal Cambiar Estatus */}
       {showEstatusModal && parteSeleccionada && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center">
+          <Card className="my-auto w-full max-w-md max-h-[min(90vh,calc(100dvh-2rem))] overflow-y-auto">
             <CardHeader className="flex-row items-center justify-between space-y-0 border-b pb-4">
               <CardTitle>Cambiar Estatus de Parte</CardTitle>
               <Button

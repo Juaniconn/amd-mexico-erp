@@ -34,6 +34,23 @@ export default function Login() {
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
+      if (data.user.permisos) {
+        localStorage.setItem('permisos', JSON.stringify(data.user.permisos));
+      }
+      if (data.user.sucursalId) {
+        localStorage.setItem('sucursalId', data.user.sucursalId);
+      }
+      if (data.user.sucursal) {
+        localStorage.setItem('sucursal', JSON.stringify(data.user.sucursal));
+      }
+      if (!localStorage.getItem('sucursalFilter')) {
+        localStorage.setItem(
+          'sucursalFilter',
+          data.user.role === 'ADMIN' || data.user.role === 'GERENTE'
+            ? 'all'
+            : data.user.sucursalId || 'all',
+        );
+      }
 
       document.cookie = `accessToken=${data.accessToken}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax`;
       document.cookie = `refreshToken=${data.refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;

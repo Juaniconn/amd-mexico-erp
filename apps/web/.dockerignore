@@ -1,0 +1,27 @@
+# .dockerignore para apps/web
+**/.git
+**/.env*
+!/.env
+**/backups
+**/infra
+**/docs
+**/.github
+**/README.md
+**/*.md
+!apps/web/README.md
+**/LICENSE
+**/.vscode
+**/.idea
+**/coverage
+**/*.test.ts
+**/*.spec.ts
+**/__tests__
+tmp
+*.tmp
+*.log
+.DS_Store
+
+# Permitir node_modules
+!node_modules
+!apps/web/node_modules
+!packages/shared/node_modules

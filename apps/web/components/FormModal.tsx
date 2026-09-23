@@ -1,32 +1,22 @@
-import * as React from 'react';
-import { Button } from '@/components/ui/button';
+'use client';
 import { X } from 'lucide-react';
 
-interface FormModalProps {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  maxWidth?: string;
-}
-
-export function FormModal({ open, onClose, title, children, maxWidth = 'max-w-lg' }: FormModalProps) {
-  if (!open) return null;
-
+export function FormModal({ title, onClose, onSubmit, children }: { title: string; onClose: () => void; onSubmit: (e: React.FormEvent) => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
-      <div className={`w-full ${maxWidth} max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 animate-fade-up relative shadow-2xl`}>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} className="h-8 w-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center">
+      <div className="my-auto w-full max-w-lg max-h-[min(90vh,calc(100dvh-2rem))] overflow-y-auto rounded-md border border-border bg-card p-4">
+        <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Cerrar"
+          >
             <X className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
-        {children}
+        <form onSubmit={onSubmit} className="space-y-3">{children}</form>
       </div>
     </div>
   );

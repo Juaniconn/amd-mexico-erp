@@ -39,7 +39,7 @@ import {
   X,
   Plus,
 } from 'lucide-react';
-import { get, put, del, ApiError } from '@/lib/api';
+import { get, put, del, post, ApiError } from '@/lib/api';
 import type { CotizacionWithParts, DetalleCotizacion } from '@/types';
 
 const ESTATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
@@ -82,7 +82,7 @@ interface EditForm {
   fechaEntrega: string;
   notas: string;
   estatus: string;
-  lineas: { descripcion: string; cantidad: number; unidad: string; precioUnitario: number }[];
+  lineas: { numeroParte: string; descripcion: string; cantidad: number; unidad: string; precioUnitario: number }[];
 }
 
 export default function CotizacionDetallePage() {
@@ -96,6 +96,7 @@ export default function CotizacionDetallePage() {
   const [actionLoading, setActionLoading] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generatedOTId, setGeneratedOTId] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState<EditForm>({
     moneda: 'MXN',
@@ -111,6 +112,17 @@ export default function CotizacionDetallePage() {
       setError('');
       const data = await get<CotizacionWithParts>(`/api/cotizaciones/${id}`);
       setCotizacion(data);
+      // Si está convertida, buscar la OT asociada
+      if (data.estatus === 'CONVERTIDA') {
+        try {
+          const ots = await get<{ id: string; folio: string }[]>(`/api/ordenes-trabajo/cotizacion/${id}`);
+          if (ots && ots.length > 0) {
+            setGeneratedOTId(ots[0].id);
+          }
+        } catch {
+          // no hay OT
+        }
+      }
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 404) {
         setError('Cotización no encontrada');
@@ -138,6 +150,46 @@ export default function CotizacionDetallePage() {
     }
   };
 
+  const handleAprobar = async () => {
+    if (!confirm('¿Está seguro de aprobar esta cotización? Se convertirá en una Orden de Trabajo.')) return;
+    setActionLoading('approve');
+    try {
+      const result = await post<{ id: string }>(`/api/cotizaciones/${id}/aprobar`, {});
+      setGeneratedOTId(result?.id || null);
+      await fetchCotizacion();
+    } catch (err: any) {
+      setError(err?.message || 'Error al aprobar');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!confirm('¿Está seguro de rechazar esta cotización?')) return;
+    setActionLoading('reject');
+    try {
+      await put(`/api/cotizaciones/${id}`, { estatus: 'RECHAZADA' });
+      await fetchCotizacion();
+    } catch (err: any) {
+      setError(err?.message || 'Error al rechazar');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!confirm('¿Está seguro de cancelar esta cotización?')) return;
+    setActionLoading('cancel');
+    try {
+      await put(`/api/cotizaciones/${id}`, { estatus: 'CANCELADA' });
+      await fetchCotizacion();
+    } catch (err: any) {
+      setError(err?.message || 'Error al cancelar');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('¿Está seguro de eliminar esta cotización?')) return;
     setActionLoading('delete');
@@ -151,8 +203,22 @@ export default function CotizacionDetallePage() {
     }
   };
 
-  const handleConvertToOT = () => {
-    router.push(`/produccion?cotizacionId=${id}`);
+  const handleConvertToOT = async () => {
+    if (!confirm('¿Está seguro de convertir esta cotización a Orden de Trabajo?')) return;
+    setActionLoading('convert');
+    try {
+      const result = await post<{ id: string }>(`/api/ordenes-trabajo/convertir-cotizacion`, {
+        cotizacionId: id,
+      });
+      await fetchCotizacion();
+      if (result?.id) {
+        router.push(`/produccion/ot/${result.id}`);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error al convertir a OT');
+    } finally {
+      setActionLoading('');
+    }
   };
 
   function openEditModal() {
@@ -163,6 +229,7 @@ export default function CotizacionDetallePage() {
       notas: cotizacion.notas || '',
       estatus: cotizacion.estatus || 'BORRADOR',
       lineas: (cotizacion.detalles || []).map((d: DetalleCotizacion) => ({
+        numeroParte: (d as any).numeroParte || '',
         descripcion: d.piezaNombre || '',
         cantidad: d.cantidad || 1,
         unidad: d.unidad || 'PZA',
@@ -179,12 +246,12 @@ export default function CotizacionDetallePage() {
     try {
       await put(`/api/cotizaciones/${id}`, {
         moneda: editForm.moneda,
-        fechaEntrega: editForm.fechaEntrega || undefined,
         notas: editForm.notas || undefined,
         estatus: editForm.estatus,
-        lineas: editForm.lineas.length > 0
+        detalles: editForm.lineas.length > 0
           ? editForm.lineas.map(l => ({
-              descripcion: l.descripcion,
+              numeroParte: l.numeroParte,
+              piezaNombre: l.descripcion,
               cantidad: Number(l.cantidad),
               unidad: l.unidad,
               precioUnitario: Number(l.precioUnitario),
@@ -203,7 +270,7 @@ export default function CotizacionDetallePage() {
   function addEditLinea() {
     setEditForm({
       ...editForm,
-      lineas: [...editForm.lineas, { descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
+      lineas: [...editForm.lineas, { numeroParte: '', descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
     });
   }
 
@@ -279,65 +346,171 @@ export default function CotizacionDetallePage() {
               </p>
             </div>
           </div>
+
         </div>
 
-        {/* Action Buttons */}
-        {(isEditable || isAprobada) && (
-          <div className="flex flex-wrap gap-2">
-            {isEditable && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSend}
-                  disabled={!!actionLoading}
-                  className="gap-2"
-                >
-                  {actionLoading === 'send' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
+        {/* Status Stepper - Visual del flujo */}
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">Progreso del flujo</span>
+            <Badge variant={ESTATUS_VARIANTS[estatus] || 'secondary'}>
+              {ESTATUS_LABELS[estatus] || estatus}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-1">
+            {['BORRADOR', 'ENVIADA', 'ACEPTADA'].map((step, idx) => {
+              const stepOrder = ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'ACEPTADA', 'CONVERTIDA'];
+              const currentIdx = stepOrder.indexOf(estatus);
+              const stepIdx = idx;
+              const isActive = currentIdx >= stepIdx;
+              const isCurrent = stepOrder[currentIdx] === step;
+              const isRejected = estatus === 'RECHAZADA' && step === 'ACEPTADA';
+              const isCanceled = estatus === 'CANCELADA' && step === 'ACEPTADA';
+              return (
+                <div key={step} className="flex items-center gap-1 flex-1">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition ${
+                    isCurrent ? 'bg-brand text-white' :
+                    isActive ? 'bg-success/20 text-success' :
+                    'bg-muted text-muted-foreground'
+                  } ${isRejected || isCanceled ? 'bg-destructive/20 text-destructive' : ''}`}>
+                    {idx + 1}
+                  </div>
+                  <span className={`text-[10px] font-medium ${
+                    isCurrent ? 'text-foreground' : isActive ? 'text-success' : 'text-muted-foreground'
+                  }`}>
+                    {step === 'BORRADOR' ? 'Borrador' : step === 'ENVIADA' ? 'Enviada' : 'Aprobada'}
+                  </span>
+                  {idx < 2 && (
+                    <div className={`h-0.5 flex-1 ${currentIdx > idx ? 'bg-success' : 'bg-border'}`} />
                   )}
-                  Enviar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={openEditModal}
-                  disabled={!!actionLoading}
-                  className="gap-2"
-                >
-                  <Edit className="w-4 h-4" />
-                  Editar
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleDelete}
-                  disabled={!!actionLoading}
-                  className="gap-2"
-                >
-                  {actionLoading === 'delete' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                  Eliminar
-                </Button>
-              </>
-            )}
-            {isAprobada && (
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action Buttons - Contextual según estado */}
+        <div className="flex flex-wrap gap-2">
+          {(estatus === 'BORRADOR' || estatus === 'EN_REVISION') && (
+            <>
               <Button
+                variant="default"
                 size="sm"
-                onClick={handleConvertToOT}
+                onClick={handleSend}
+                disabled={!!actionLoading}
                 className="gap-2"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Convertir a OT
+                {actionLoading === 'send' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                {estatus === 'BORRADOR' ? 'Enviar' : 'Reenviar'}
               </Button>
-            )}
-          </div>
-        )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openEditModal}
+                disabled={!!actionLoading}
+                className="gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                Editar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                disabled={!!actionLoading}
+                className="gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Eliminar
+              </Button>
+            </>
+          )}
+
+          {estatus === 'ENVIADA' && (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleAprobar}
+                disabled={!!actionLoading}
+                className="gap-2 bg-success hover:bg-success/90"
+              >
+                {actionLoading === 'approve' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                Aprobar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReject}
+                disabled={!!actionLoading}
+                className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+              >
+                {actionLoading === 'reject' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <XCircle className="w-4 h-4" />
+                )}
+                Rechazar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+                disabled={!!actionLoading}
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Cancelar
+              </Button>
+            </>
+          )}
+
+          {estatus === 'ACEPTADA' && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleConvertToOT}
+              disabled={!!actionLoading}
+              className="gap-2 bg-success hover:bg-success/90"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Convertir a OT
+            </Button>
+          )}
+
+          {estatus === 'CONVERTIDA' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (generatedOTId) {
+                  router.push(`/produccion/ot/${generatedOTId}`);
+                } else {
+                  router.push(`/produccion?cotizacionId=${id}`);
+                }
+              }}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Ver OT
+            </Button>
+          )}
+
+          {(estatus === 'RECHAZADA' || estatus === 'CANCELADA') && (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+              Esta cotización está {estatus === 'RECHAZADA' ? 'rechazada' : 'cancelada'}. No se pueden realizar más acciones.
+            </div>
+          )}
+        </div>
 
         {/* Error message */}
         {error && (
@@ -483,7 +656,8 @@ export default function CotizacionDetallePage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12">#</TableHead>
+                        <TableHead className="w-10">#</TableHead>
+                        <TableHead className="w-28">No. Parte</TableHead>
                         <TableHead>Pieza / Descripción</TableHead>
                         <TableHead className="text-right">Cantidad</TableHead>
                         <TableHead>Unidad</TableHead>
@@ -496,6 +670,9 @@ export default function CotizacionDetallePage() {
                         <TableRow key={d.id || idx}>
                           <TableCell className="text-muted-foreground font-mono text-xs">
                             {idx + 1}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {(d as any).numeroParte || '—'}
                           </TableCell>
                           <TableCell>
                             <div>
@@ -557,7 +734,7 @@ export default function CotizacionDetallePage() {
 
         {/* Edit Modal */}
         {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
             <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
               <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
                 <h2 className="text-lg font-semibold text-foreground">Editar Cotización {cotizacion?.folio}</h2>
@@ -630,72 +807,108 @@ export default function CotizacionDetallePage() {
                       Agregue al menos una partida
                     </p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {editForm.lineas.map((l, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            placeholder="Descripción"
-                            value={l.descripcion}
-                            onChange={(e) => {
-                              const updated = [...editForm.lineas];
-                              updated[i] = { ...l, descripcion: e.target.value };
-                              setEditForm({ ...editForm, lineas: updated });
-                            }}
-                            className="input-base flex-1"
-                          />
-                          <input
-                            type="number"
-                            placeholder="Cant."
-                            min={1}
-                            value={l.cantidad}
-                            onChange={(e) => {
-                              const updated = [...editForm.lineas];
-                              updated[i] = { ...l, cantidad: Number(e.target.value) };
-                              setEditForm({ ...editForm, lineas: updated });
-                            }}
-                            className="input-base w-20"
-                          />
-                          <select
-                            value={l.unidad}
-                            onChange={(e) => {
-                              const updated = [...editForm.lineas];
-                              updated[i] = { ...l, unidad: e.target.value };
-                              setEditForm({ ...editForm, lineas: updated });
-                            }}
-                            className="input-base w-24"
-                          >
-                            <option value="PZA">PZA</option>
-                            <option value="KG">KG</option>
-                            <option value="M">M</option>
-                            <option value="M²">M²</option>
-                            <option value="M³">M³</option>
-                            <option value="LT">LT</option>
-                            <option value="HR">HR</option>
-                            <option value="JGO">JGO</option>
-                            <option value="PAR">PAR</option>
-                          </select>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="Precio"
-                            min={0}
-                            value={l.precioUnitario}
-                            onChange={(e) => {
-                              const updated = [...editForm.lineas];
-                              updated[i] = { ...l, precioUnitario: Number(e.target.value) };
-                              setEditForm({ ...editForm, lineas: updated });
-                            }}
-                            className="input-base w-28"
-                          />
+                        <div
+                          key={i}
+                          className="rounded-lg border border-border p-3 space-y-2 sm:flex sm:items-center sm:gap-2 sm:border-0 sm:p-0 sm:space-y-0"
+                        >
+                          <div className="sm:w-28 shrink-0">
+                            <label className="mb-1 block text-[10px] uppercase text-muted-foreground sm:hidden">
+                              Número de Parte
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Núm. parte"
+                              value={l.numeroParte}
+                              onChange={(e) => {
+                                const updated = [...editForm.lineas];
+                                updated[i] = { ...l, numeroParte: e.target.value };
+                                setEditForm({ ...editForm, lineas: updated });
+                              }}
+                              className="input-base w-full"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <label className="mb-1 block text-[10px] uppercase text-muted-foreground sm:hidden">
+                              Descripción
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Descripción"
+                              value={l.descripcion}
+                              onChange={(e) => {
+                                const updated = [...editForm.lineas];
+                                updated[i] = { ...l, descripcion: e.target.value };
+                                setEditForm({ ...editForm, lineas: updated });
+                              }}
+                              className="input-base w-full"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 sm:contents">
+                            <div>
+                              <label className="mb-1 block text-[10px] uppercase text-muted-foreground sm:hidden">Cant.</label>
+                              <input
+                                type="number"
+                                placeholder="Cant."
+                                min={1}
+                                value={l.cantidad}
+                                onChange={(e) => {
+                                  const updated = [...editForm.lineas];
+                                  updated[i] = { ...l, cantidad: Number(e.target.value) };
+                                  setEditForm({ ...editForm, lineas: updated });
+                                }}
+                                className="input-base w-full sm:w-20"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] uppercase text-muted-foreground sm:hidden">Unidad</label>
+                              <select
+                                value={l.unidad}
+                                onChange={(e) => {
+                                  const updated = [...editForm.lineas];
+                                  updated[i] = { ...l, unidad: e.target.value };
+                                  setEditForm({ ...editForm, lineas: updated });
+                                }}
+                                className="input-base w-full sm:w-24"
+                              >
+                                <option value="PZA">PZA</option>
+                                <option value="KG">KG</option>
+                                <option value="M">M</option>
+                                <option value="M²">M²</option>
+                                <option value="M³">M³</option>
+                                <option value="LT">LT</option>
+                                <option value="HR">HR</option>
+                                <option value="JGO">JGO</option>
+                                <option value="PAR">PAR</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] uppercase text-muted-foreground sm:hidden">Precio</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="Precio"
+                              min={0}
+                              value={l.precioUnitario}
+                              onChange={(e) => {
+                                const updated = [...editForm.lineas];
+                                updated[i] = { ...l, precioUnitario: Number(e.target.value) };
+                                setEditForm({ ...editForm, lineas: updated });
+                              }}
+                              className="input-base w-full sm:w-28"
+                            />
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon-sm"
+                            size="sm"
                             onClick={() => removeEditLinea(i)}
-                            className="text-destructive hover:text-destructive"
+                            className="w-full text-destructive hover:text-destructive sm:w-auto"
                           >
                             <X className="h-4 w-4" />
+                            <span className="ml-1 sm:hidden">Quitar</span>
                           </Button>
                         </div>
                       ))}

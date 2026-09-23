@@ -32,7 +32,7 @@ interface CotizacionFormData {
   moneda: string;
   fechaEntrega: string;
   notas: string;
-  lineas: { descripcion: string; cantidad: number; unidad: string; precioUnitario: number }[];
+  lineas: { numeroParte: string; descripcion: string; cantidad: number; unidad: string; precioUnitario: number }[];
 }
 
 interface CotizacionListItem extends Cotizacion {
@@ -185,6 +185,16 @@ function CotizacionesContent() {
     }
   }
 
+  async function handleCardStatusChange(id: string, newStatus: string) {
+    try {
+      setError('');
+      await put(`/api/cotizaciones/${id}`, { estatus: newStatus });
+      loadCotizaciones(page, search, statusFilter);
+    } catch (err: any) {
+      setError(err?.message || 'Error al cambiar estatus');
+    }
+  }
+
   function openNewCotizacion() {
     setForm({
       clienteId: '',
@@ -207,6 +217,7 @@ function CotizacionesContent() {
       fechaEntrega: (c as any).fechaEntrega || '',
       notas: c.notas || '',
       lineas: (c as any).detalles?.map((l: any) => ({
+        numeroParte: l.numeroParte || '',
         descripcion: l.descripcion || l.piezaNombre || '',
         cantidad: l.cantidad || 1,
         unidad: l.unidad || 'PZA',
@@ -268,6 +279,7 @@ function CotizacionesContent() {
       fechaEntrega: (detailCotizacion as any).fechaEntrega || '',
       notas: detailCotizacion.notas || '',
       lineas: (detailCotizacion.detalles || []).map((d: DetalleCotizacion) => ({
+        numeroParte: (d as any).numeroParte || '',
         descripcion: d.piezaNombre || '',
         cantidad: d.cantidad || 1,
         unidad: d.unidad || 'PZA',
@@ -292,6 +304,7 @@ function CotizacionesContent() {
         notas: form.notas || undefined,
         detalles: form.lineas.length > 0
           ? form.lineas.map(l => ({
+              numeroParte: l.numeroParte,
               piezaNombre: l.descripcion,
               piezaDescripcion: undefined,
               cantidad: Number(l.cantidad),
@@ -325,6 +338,7 @@ function CotizacionesContent() {
         estatus: editingCotizacion.estatus,
         detalles: editForm.lineas.length > 0
           ? editForm.lineas.map(l => ({
+              numeroParte: l.numeroParte,
               piezaNombre: l.descripcion,
               piezaDescripcion: undefined,
               cantidad: Number(l.cantidad),
@@ -349,7 +363,7 @@ function CotizacionesContent() {
   function addLinea() {
     setForm({
       ...form,
-      lineas: [...form.lineas, { descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
+      lineas: [...form.lineas, { numeroParte: '', descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
     });
   }
 
@@ -363,7 +377,7 @@ function CotizacionesContent() {
   function addEditLinea() {
     setEditForm({
       ...editForm,
-      lineas: [...editForm.lineas, { descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
+      lineas: [...editForm.lineas, { numeroParte: '', descripcion: '', cantidad: 1, unidad: 'PZA', precioUnitario: 0 }],
     });
   }
 
@@ -399,7 +413,7 @@ function CotizacionesContent() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-muted text-brand">
               <FileText className="h-5 w-5" />
             </div>
             <div>
@@ -410,7 +424,7 @@ function CotizacionesContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-muted text-warning">
               <Clock className="h-5 w-5" />
             </div>
             <div>
@@ -421,7 +435,7 @@ function CotizacionesContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-muted text-success">
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
@@ -517,13 +531,13 @@ function CotizacionesContent() {
             {cotizaciones.map((c) => (
               <div
                 key={c.id}
-                onClick={() => openDetailCard(c)}
+                onClick={() => router.push(`/cotizaciones/${c.id}`)}
                 className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-muted text-brand">
                       <Hash className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
@@ -559,33 +573,6 @@ function CotizacionesContent() {
                 {/* Card Footer */}
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                   <span className="text-xs text-muted-foreground">Clic para ver detalle</span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => { e.stopPropagation(); openDetailCard(c); }}
-                      title="Ver detalle"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => { e.stopPropagation(); openEditCotizacion(c); }}
-                      title="Editar cotización"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
-                      title="Eliminar cotización"
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
                 </div>
               </div>
             ))}
@@ -593,7 +580,7 @@ function CotizacionesContent() {
 
           {/* Pagination Footer */}
           {meta && !loading && cotizaciones.length > 0 && (
-            <div className="flex items-center justify-between border-t border-border pt-4 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-3 border-t border-border pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <span>
                 Mostrando {cotizaciones.length} de {meta.total} cotizaciones
               </span>
@@ -622,8 +609,8 @@ function CotizacionesContent() {
 
       {/* New Cotización Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-4 sm:p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
               <h2 className="text-lg font-semibold text-foreground">Nueva Cotización</h2>
               <button
@@ -690,7 +677,7 @@ function CotizacionesContent() {
 
               {/* Lineas */}
               <div>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     Partidas
                   </label>
@@ -704,73 +691,118 @@ function CotizacionesContent() {
                     Agregue al menos una partida
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
+                      <span className="col-span-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Número de Parte</span>
+                      <span className="col-span-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Descripción</span>
+                      <span className="col-span-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Cant.</span>
+                      <span className="col-span-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Unidad</span>
+                      <span className="col-span-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Precio</span>
+                      <span className="col-span-2"></span>
+                    </div>
                     {form.lineas.map((l, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Descripción"
-                          value={l.descripcion}
-                          onChange={(e) => {
-                            const updated = [...form.lineas];
-                            updated[i] = { ...l, descripcion: e.target.value };
-                            setForm({ ...form, lineas: updated });
-                          }}
-                          className="input-base flex-1"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Cant."
-                          min={1}
-                          value={l.cantidad}
-                          onChange={(e) => {
-                            const updated = [...form.lineas];
-                            updated[i] = { ...l, cantidad: Number(e.target.value) };
-                            setForm({ ...form, lineas: updated });
-                          }}
-                          className="input-base w-20"
-                        />
-                        <select
-                          value={l.unidad}
-                          onChange={(e) => {
-                            const updated = [...form.lineas];
-                            updated[i] = { ...l, unidad: e.target.value };
-                            setForm({ ...form, lineas: updated });
-                          }}
-                          className="input-base w-24"
-                        >
-                          <option value="PZA">PZA</option>
-                          <option value="KG">KG</option>
-                          <option value="M">M</option>
-                          <option value="M²">M²</option>
-                          <option value="M³">M³</option>
-                          <option value="LT">LT</option>
-                          <option value="HR">HR</option>
-                          <option value="JGO">JGO</option>
-                          <option value="PAR">PAR</option>
-                        </select>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Precio"
-                          min={0}
-                          value={l.precioUnitario}
-                          onChange={(e) => {
-                            const updated = [...form.lineas];
-                            updated[i] = { ...l, precioUnitario: Number(e.target.value) };
-                            setForm({ ...form, lineas: updated });
-                          }}
-                          className="input-base w-28"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => removeLinea(i)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                      <div
+                        key={i}
+                        className="rounded-lg border border-border p-3 space-y-2 sm:rounded-none sm:border-0 sm:p-0 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center"
+                      >
+                        <div className="sm:col-span-2">
+                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Número de Parte</label>
+                          <input
+                            type="text"
+                            placeholder="Número de Parte"
+                            value={l.numeroParte}
+                            onChange={(e) => {
+                              const updated = [...form.lineas];
+                              updated[i] = { ...l, numeroParte: e.target.value };
+                              setForm({ ...form, lineas: updated });
+                            }}
+                            className="input-base w-full"
+                          />
+                        </div>
+                        <div className="sm:col-span-4">
+                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Descripción</label>
+                          <input
+                            type="text"
+                            placeholder="Descripción"
+                            value={l.descripcion}
+                            onChange={(e) => {
+                              const updated = [...form.lineas];
+                              updated[i] = { ...l, descripcion: e.target.value };
+                              setForm({ ...form, lineas: updated });
+                            }}
+                            className="input-base w-full"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:contents">
+                          <div className="sm:col-span-1">
+                            <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Cant.</label>
+                            <input
+                              type="number"
+                              placeholder="Cant."
+                              min={1}
+                              value={l.cantidad}
+                              onChange={(e) => {
+                                const updated = [...form.lineas];
+                                updated[i] = { ...l, cantidad: Number(e.target.value) };
+                                setForm({ ...form, lineas: updated });
+                              }}
+                              className="input-base w-full"
+                            />
+                          </div>
+                          <div className="sm:col-span-1">
+                            <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Unidad</label>
+                            <select
+                              value={l.unidad}
+                              onChange={(e) => {
+                                const updated = [...form.lineas];
+                                updated[i] = { ...l, unidad: e.target.value };
+                                setForm({ ...form, lineas: updated });
+                              }}
+                              className="input-base w-full"
+                            >
+                              <option value="PZA">PZA</option>
+                              <option value="KG">KG</option>
+                              <option value="M">M</option>
+                              <option value="M²">M²</option>
+                              <option value="M³">M³</option>
+                              <option value="LT">LT</option>
+                              <option value="HR">HR</option>
+                              <option value="JGO">JGO</option>
+                              <option value="PAR">PAR</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Precio</label>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                            <input
+                              type="text"
+                              placeholder="0.00"
+                              value={l.precioUnitario === 0 ? '' : l.precioUnitario}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9.]/g, '');
+                                const num = parseFloat(val) || 0;
+                                const updated = [...form.lineas];
+                                updated[i] = { ...l, precioUnitario: num };
+                                setForm({ ...form, lineas: updated });
+                              }}
+                              className="input-base pl-7 w-full"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex sm:col-span-2 sm:justify-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeLinea(i)}
+                            className="w-full text-destructive hover:text-destructive sm:w-auto"
+                          >
+                            <X className="h-4 w-4" />
+                            <span className="ml-1 sm:hidden">Quitar</span>
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -797,7 +829,7 @@ function CotizacionesContent() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 border-t border-border pt-4">
+              <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end sm:gap-3 [&>button]:w-full sm:[&>button]:w-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -817,16 +849,17 @@ function CotizacionesContent() {
 
       {/* Edit Cotización Modal */}
       {showEditModal && editingCotizacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-4 sm:p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
-              <h2 className="text-lg font-semibold text-foreground">Editar Cotización {editingCotizacion.folio}</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-foreground truncate pr-2">Editar Cotización {editingCotizacion.folio}</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingCotizacion(null);
                 }}
-                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label="Cerrar"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -888,7 +921,7 @@ function CotizacionesContent() {
 
               {/* Lineas */}
               <div>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     Partidas
                   </label>
@@ -902,73 +935,118 @@ function CotizacionesContent() {
                     Agregue al menos una partida
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
+                      <span className="col-span-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Número de Parte</span>
+                      <span className="col-span-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Descripción</span>
+                      <span className="col-span-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Cant.</span>
+                      <span className="col-span-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Unidad</span>
+                      <span className="col-span-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Precio</span>
+                      <span className="col-span-2"></span>
+                    </div>
                     {editForm.lineas.map((l, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Descripción"
-                          value={l.descripcion}
-                          onChange={(e) => {
-                            const updated = [...editForm.lineas];
-                            updated[i] = { ...l, descripcion: e.target.value };
-                            setEditForm({ ...editForm, lineas: updated });
-                          }}
-                          className="input-base flex-1"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Cant."
-                          min={1}
-                          value={l.cantidad}
-                          onChange={(e) => {
-                            const updated = [...editForm.lineas];
-                            updated[i] = { ...l, cantidad: Number(e.target.value) };
-                            setEditForm({ ...editForm, lineas: updated });
-                          }}
-                          className="input-base w-20"
-                        />
-                        <select
-                          value={l.unidad}
-                          onChange={(e) => {
-                            const updated = [...editForm.lineas];
-                            updated[i] = { ...l, unidad: e.target.value };
-                            setEditForm({ ...editForm, lineas: updated });
-                          }}
-                          className="input-base w-24"
-                        >
-                          <option value="PZA">PZA</option>
-                          <option value="KG">KG</option>
-                          <option value="M">M</option>
-                          <option value="M²">M²</option>
-                          <option value="M³">M³</option>
-                          <option value="LT">LT</option>
-                          <option value="HR">HR</option>
-                          <option value="JGO">JGO</option>
-                          <option value="PAR">PAR</option>
-                        </select>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Precio"
-                          min={0}
-                          value={l.precioUnitario}
-                          onChange={(e) => {
-                            const updated = [...editForm.lineas];
-                            updated[i] = { ...l, precioUnitario: Number(e.target.value) };
-                            setEditForm({ ...editForm, lineas: updated });
-                          }}
-                          className="input-base w-28"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => removeEditLinea(i)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                      <div
+                        key={i}
+                        className="rounded-lg border border-border p-3 space-y-2 sm:rounded-none sm:border-0 sm:p-0 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center"
+                      >
+                        <div className="sm:col-span-2">
+                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Número de Parte</label>
+                          <input
+                            type="text"
+                            placeholder="Número de Parte"
+                            value={l.numeroParte}
+                            onChange={(e) => {
+                              const updated = [...editForm.lineas];
+                              updated[i] = { ...l, numeroParte: e.target.value };
+                              setEditForm({ ...editForm, lineas: updated });
+                            }}
+                            className="input-base w-full"
+                          />
+                        </div>
+                        <div className="sm:col-span-4">
+                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Descripción</label>
+                          <input
+                            type="text"
+                            placeholder="Descripción"
+                            value={l.descripcion}
+                            onChange={(e) => {
+                              const updated = [...editForm.lineas];
+                              updated[i] = { ...l, descripcion: e.target.value };
+                              setEditForm({ ...editForm, lineas: updated });
+                            }}
+                            className="input-base w-full"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:contents">
+                          <div className="sm:col-span-1">
+                            <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Cant.</label>
+                            <input
+                              type="number"
+                              placeholder="Cant."
+                              min={1}
+                              value={l.cantidad}
+                              onChange={(e) => {
+                                const updated = [...editForm.lineas];
+                                updated[i] = { ...l, cantidad: Number(e.target.value) };
+                                setEditForm({ ...editForm, lineas: updated });
+                              }}
+                              className="input-base w-full"
+                            />
+                          </div>
+                          <div className="sm:col-span-1">
+                            <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Unidad</label>
+                            <select
+                              value={l.unidad}
+                              onChange={(e) => {
+                                const updated = [...editForm.lineas];
+                                updated[i] = { ...l, unidad: e.target.value };
+                                setEditForm({ ...editForm, lineas: updated });
+                              }}
+                              className="input-base w-full"
+                            >
+                              <option value="PZA">PZA</option>
+                              <option value="KG">KG</option>
+                              <option value="M">M</option>
+                              <option value="M²">M²</option>
+                              <option value="M³">M³</option>
+                              <option value="LT">LT</option>
+                              <option value="HR">HR</option>
+                              <option value="JGO">JGO</option>
+                              <option value="PAR">PAR</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">Precio</label>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                            <input
+                              type="text"
+                              placeholder="0.00"
+                              value={l.precioUnitario === 0 ? '' : l.precioUnitario}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9.]/g, '');
+                                const num = parseFloat(val) || 0;
+                                const updated = [...editForm.lineas];
+                                updated[i] = { ...l, precioUnitario: num };
+                                setEditForm({ ...editForm, lineas: updated });
+                              }}
+                              className="input-base pl-7 w-full"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex sm:col-span-2 sm:justify-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeEditLinea(i)}
+                            className="w-full text-destructive hover:text-destructive sm:w-auto"
+                          >
+                            <X className="h-4 w-4" />
+                            <span className="ml-1 sm:hidden">Quitar</span>
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -995,7 +1073,7 @@ function CotizacionesContent() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 border-t border-border pt-4">
+              <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end sm:gap-3 [&>button]:w-full sm:[&>button]:w-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -1018,7 +1096,7 @@ function CotizacionesContent() {
 
       {/* Detail Modal — shows full cotizacion info with actions */}
       {showDetailModal && detailCotizacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
           <div
             className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}

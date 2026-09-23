@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -98,6 +99,7 @@ export default function ProduccionPage() {
 }
 
 function ProduccionContent() {
+  const router = useRouter();
   const [ordenes, setOrdenes] = useState<OrdenTrabajo[]>([]);
   const [meta, setMeta] = useState<{ total: number; page: number; limit: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -327,7 +329,7 @@ function ProduccionContent() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-muted text-brand">
               <ClipboardList className="h-5 w-5" />
             </div>
             <div>
@@ -338,7 +340,7 @@ function ProduccionContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-muted text-brand">
               <Loader2 className="h-5 w-5" />
             </div>
             <div>
@@ -349,7 +351,7 @@ function ProduccionContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-muted text-success">
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
@@ -360,7 +362,7 @@ function ProduccionContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-muted text-warning">
               <Timer className="h-5 w-5" />
             </div>
             <div>
@@ -441,16 +443,16 @@ function ProduccionContent() {
           {ordenes.map((o) => (
             <div
               key={o.id}
-              onClick={() => openDetailCard(o)}
+              onClick={() => router.push(`/produccion/ot/${o.id}`)}
               className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-brand/30 hover:shadow-lg"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                    o.estatus === 'COMPLETADA' ? 'bg-success/10 text-success' :
+                    o.estatus === 'COMPLETADA' ? 'bg-success-muted text-success' :
                     o.estatus === 'CANCELADA' ? 'bg-muted text-muted-foreground' :
-                    'bg-brand/10 text-brand'
+                    'bg-brand-muted text-brand'
                   }`}>
                     <ClipboardList className="h-5 w-5" />
                   </div>
@@ -535,7 +537,7 @@ function ProduccionContent() {
 
       {/* New OT Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
               <h2 className="text-lg font-semibold text-foreground">Nueva Orden de Trabajo</h2>
@@ -679,7 +681,7 @@ function ProduccionContent() {
 
       {/* Edit OT Modal */}
       {showEditModal && editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
               <h2 className="text-lg font-semibold text-foreground">Editar OT {editing.folio}</h2>
@@ -767,7 +769,7 @@ function ProduccionContent() {
 
       {/* Detail Modal */}
       {showDetailModal && detailOT && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
           <div
             className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}

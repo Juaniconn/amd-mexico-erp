@@ -1,9 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // NO inyectar NEXT_PUBLIC_API_URL — las rutas hardcodeadas ya incluyen /api/
+  // API_URL vacío — las rutas en código ya incluyen /api/
   env: {
-    NEXT_PUBLIC_API_URL: '/api',
+    NEXT_PUBLIC_API_URL: '',
+  },
+  // Reescribir /api/* al backend NestJS
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/api/:path*',
+          destination: 'http://127.0.0.1:3001/api/:path*',
+        },
+      ],
+    };
   },
 };
 

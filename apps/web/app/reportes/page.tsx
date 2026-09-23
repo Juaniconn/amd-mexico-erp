@@ -362,7 +362,7 @@ function FinancialSummaryCard({
           </div>
           {trend && trendValue && (
             <div className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-              trend === 'up' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+              trend === 'up' ? 'bg-success-muted text-success' : 'bg-danger-muted text-danger'
             }`}>
               {trend === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
               {trendValue}

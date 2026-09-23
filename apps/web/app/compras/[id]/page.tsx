@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { get, put } from '@/lib/api';
+import { get, patch } from '@/lib/api';
+import type { OrdenCompra, EstatusOrdenCompra, DetalleOrdenCompra } from '@/types';
 import {
   ArrowLeft,
   Edit3,
   ShoppingCart,
-  Hash,
   Calendar,
   DollarSign,
   Package,
@@ -19,36 +19,17 @@ import {
   XCircle,
   Save,
   X,
+  Hash,
 } from 'lucide-react';
 
-interface OrdenCompraProveedor {
-  id: string;
-  proveedorId: string;
-  proveedorNombre?: string;
-  cantidad: number;
-  precioUnitario: number;
-  subtotal: number;
-  notas?: string;
-}
+// ─── Status Config ──────────────────────────────────────────
 
-interface OrdenCompra {
-  id: string;
-  folio: string;
-  clienteId: string;
-  cotizacionId?: string;
-  razonSocial?: string;
-  fecha: string;
-  fechaEntrega?: string;
-  moneda: string;
-  subtotal: number;
-  iva: number;
-  total: number;
-  estatus: string;
-  condicionesPago?: string;
-  notas?: string;
-  proveedores?: OrdenCompraProveedor[];
-  createdAt: string;
-}
+const STATUS_CONFIG: Record<EstatusOrdenCompra, { label: string; variant: 'secondary' | 'default' | 'success' | 'destructive' }> = {
+  BORRADOR: { label: 'Borrador', variant: 'secondary' },
+  ENVIADA: { label: 'Enviada', variant: 'default' },
+  RECIBIDA: { label: 'Recibida', variant: 'success' },
+  CANCELADA: { label: 'Cancelada', variant: 'destructive' },
+};
 
 interface OrdenCompraFormData {
   moneda: string;
@@ -58,10 +39,11 @@ interface OrdenCompraFormData {
   estatus: string;
 }
 
-export default function CompraDetailPage() {
+// ─── Page ───────────────────────────────────────────────────
+
+export default function CompraDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const params = useParams<{ id: string }>();
-  const id = params.id;
+  const { id } = params;
 
   const [compra, setCompra] = useState<OrdenCompra | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,21 +56,21 @@ export default function CompraDetailPage() {
     fechaEntrega: '',
     condicionesPago: '',
     notas: '',
-    estatus: 'pendiente',
+    estatus: 'BORRADOR',
   });
 
   const loadCompra = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const compra = await get<OrdenCompra>(`/api/ordenes-compra/${id}`);
-      setCompra(compra);
+      const data = await get<OrdenCompra>(`/api/compras/ordenes/${id}`);
+      setCompra(data);
       setForm({
-        moneda: compra.moneda || 'MXN',
-        fechaEntrega: compra.fechaEntrega || '',
-        condicionesPago: compra.condicionesPago || '',
-        notas: compra.notas || '',
-        estatus: compra.estatus || 'pendiente',
+        moneda: data.moneda || 'MXN',
+        fechaEntrega: data.fechaEntrega || '',
+        condicionesPago: data.condicionesPago || '',
+        notas: data.notas || '',
+        estatus: data.estatus || 'BORRADOR',
       });
     } catch (err: any) {
       setError(err?.message || 'Error al cargar la orden de compra');
@@ -106,13 +88,15 @@ export default function CompraDetailPage() {
     setSaving(true);
     setError('');
     try {
-      await put(`/api/ordenes-compra/${id}`, {
+      await patch(`/api/compras/ordenes/${id}`, {
         moneda: form.moneda,
         fechaEntrega: form.fechaEntrega || undefined,
         condicionesPago: form.condicionesPago || undefined,
         notas: form.notas || undefined,
-        estatus: form.estatus,
       });
+      if (form.estatus && form.estatus !== compra?.estatus) {
+        await patch(`/api/compras/ordenes/${id}/estatus`, { estatus: form.estatus });
+      }
       setEditing(false);
       loadCompra();
     } catch (err: any) {
@@ -149,16 +133,10 @@ export default function CompraDetailPage() {
     );
   }
 
-  const estatusConfig: Record<string, { variant: string; icon: React.ReactNode; label: string }> = {
-    pendiente: { variant: 'warning', icon: <Clock className="h-4 w-4" />, label: 'Pendiente' },
-    aprobada: { variant: 'success', icon: <CheckCircle2 className="h-4 w-4" />, label: 'Aprobada' },
-    cancelada: { variant: 'destructive', icon: <XCircle className="h-4 w-4" />, label: 'Cancelada' },
-    rechazada: { variant: 'destructive', icon: <XCircle className="h-4 w-4" />, label: 'Rechazada' },
-    en_produccion: { variant: 'brand', icon: <Clock className="h-4 w-4" />, label: 'En Producción' },
-    completada: { variant: 'success', icon: <CheckCircle2 className="h-4 w-4" />, label: 'Completada' },
-  };
-
-  const statusConfig = estatusConfig[compra.estatus.toLowerCase()] || { variant: 'default', icon: <ShoppingCart className="h-4 w-4" />, label: compra.estatus };
+  const statusKey = (Object.keys(STATUS_CONFIG).includes(compra.estatus) ? compra.estatus : 'BORRADOR') as EstatusOrdenCompra;
+  const statusCfg = STATUS_CONFIG[statusKey];
+  const impuestos = compra.impuestos ?? compra.iva ?? 0;
+  const detalles = compra.detalles || [];
 
   return (
     <AppLayout>
@@ -175,10 +153,7 @@ export default function CompraDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={statusConfig.variant as any}>
-              {statusConfig.icon}
-              {statusConfig.label}
-            </Badge>
+            <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
             {!editing && (
               <Button size="sm" className="gap-2" onClick={() => setEditing(true)}>
                 <Edit3 className="h-4 w-4" />
@@ -218,7 +193,7 @@ export default function CompraDetailPage() {
                   </div>
                   <div>
                     <p className="section-title">Fecha</p>
-                    <p className="text-sm font-medium text-foreground">{new Date(compra.createdAt).toLocaleDateString('es-MX')}</p>
+                    <p className="text-sm font-medium text-foreground">{new Date(compra.fecha).toLocaleDateString('es-MX')}</p>
                     {compra.fechaEntrega && (
                       <p className="text-xs text-muted-foreground">Entrega: {new Date(compra.fechaEntrega).toLocaleDateString('es-MX')}</p>
                     )}
@@ -243,60 +218,93 @@ export default function CompraDetailPage() {
                     <Package className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="section-title">Proveedores</p>
-                    <p className="text-2xl font-bold tracking-tight">{compra.proveedores?.length ?? 0}</p>
+                    <p className="section-title">Detalles</p>
+                    <p className="text-2xl font-bold tracking-tight">{detalles.length}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Details Card */}
+            {/* General Info */}
             <div className="rounded-xl border border-border bg-card p-5">
-              <h3 className="section-title mb-4">Detalles de la Orden</h3>
+              <h3 className="section-title mb-4">Información General</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs text-muted-foreground">Subtotal</p>
-                  <p className="text-sm font-medium">${Number(compra.subtotal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">IVA</p>
-                  <p className="text-sm font-medium">${Number(compra.iva).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-muted-foreground">Proveedor</p>
+                  <p className="text-sm font-medium">{compra.razonSocial || compra.proveedores?.[0]?.proveedorNombre || '—'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Condiciones de Pago</p>
                   <p className="text-sm font-medium">{compra.condicionesPago || '—'}</p>
                 </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Estatus</p>
+                  <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
+                </div>
               </div>
               {compra.notas && (
                 <div className="mt-4">
                   <p className="text-xs text-muted-foreground">Notas</p>
-                  <p className="text-sm text-table">{compra.notas}</p>
+                  <p className="text-sm text-table whitespace-pre-wrap">{compra.notas}</p>
                 </div>
               )}
             </div>
 
-            {/* Proveedores */}
-            {compra.proveedores && compra.proveedores.length > 0 && (
+            {/* Details Table */}
+            {detalles.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-5">
-                <h3 className="section-title mb-4">Proveedores</h3>
-                <div className="space-y-3">
-                  {compra.proveedores.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
-                          <Package className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{p.proveedorNombre || p.proveedorId}</p>
-                          <p className="text-xs text-muted-foreground">Cantidad: {p.cantidad}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium">${Number(p.subtotal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                  ))}
+                <h3 className="section-title mb-4">Detalles de la Orden</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Material</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Descripción</th>
+                        <th className="px-3 py-2 text-right font-medium text-muted-foreground">Cantidad</th>
+                        <th className="px-3 py-2 text-right font-medium text-muted-foreground">Precio Unitario</th>
+                        <th className="px-3 py-2 text-right font-medium text-muted-foreground">Importe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalles.map((d, i) => (
+                        <tr key={d.id || i} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-muted-foreground">{d.material || '—'}</td>
+                          <td className="px-3 py-2 text-foreground">{d.descripcion}</td>
+                          <td className="px-3 py-2 text-right text-foreground">{d.cantidad}</td>
+                          <td className="px-3 py-2 text-right text-foreground">
+                            ${Number(d.precioUnitario).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-foreground">
+                            ${Number(d.importe).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
+
+            {/* Totals */}
+            <div className="rounded-xl border border-border bg-card p-5">
+              <h3 className="section-title mb-4">Totales</h3>
+              <div className="flex justify-end">
+                <div className="w-full max-w-sm space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-foreground">${Number(compra.subtotal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Impuestos</span>
+                    <span className="text-foreground">${Number(impuestos).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-2 text-base font-bold">
+                    <span className="text-foreground">Total</span>
+                    <span className="text-brand">${Number(compra.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </>
         ) : (
           /* Edit Form */
@@ -304,8 +312,8 @@ export default function CompraDetailPage() {
             <div className="rounded-xl border border-border bg-card p-5">
               <h3 className="section-title mb-4">Editar Orden de Compra</h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                  <div className="sm:col-span-4">
                     <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
                       Moneda
                     </label>
@@ -314,11 +322,11 @@ export default function CompraDetailPage() {
                       onChange={(e) => setForm({ ...form, moneda: e.target.value })}
                       className="input-base"
                     >
-                      <option value="MXN">MXN</option>
-                      <option value="USD">USD</option>
+                      <option value="MXN">MXN - Peso Mexicano</option>
+                      <option value="USD">USD - Dólar Americano</option>
                     </select>
                   </div>
-                  <div>
+                  <div className="sm:col-span-4">
                     <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
                       Estatus
                     </label>
@@ -327,47 +335,47 @@ export default function CompraDetailPage() {
                       onChange={(e) => setForm({ ...form, estatus: e.target.value })}
                       className="input-base"
                     >
-                      <option value="pendiente">Pendiente</option>
-                      <option value="aprobada">Aprobada</option>
-                      <option value="cancelada">Cancelada</option>
-                      <option value="rechazada">Rechazada</option>
-                      <option value="en_produccion">En Producción</option>
-                      <option value="completada">Completada</option>
+                      <option value="BORRADOR">Borrador</option>
+                      <option value="ENVIADA">Enviada</option>
+                      <option value="RECIBIDA">Recibida</option>
+                      <option value="CANCELADA">Cancelada</option>
                     </select>
                   </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Fecha Entrega
-                  </label>
-                  <input
-                    type="date"
-                    value={form.fechaEntrega}
-                    onChange={(e) => setForm({ ...form, fechaEntrega: e.target.value })}
-                    className="input-base"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Condiciones de Pago
-                  </label>
-                  <input
-                    type="text"
-                    value={form.condicionesPago}
-                    onChange={(e) => setForm({ ...form, condicionesPago: e.target.value })}
-                    className="input-base"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                    Notas
-                  </label>
-                  <textarea
-                    value={form.notas}
-                    onChange={(e) => setForm({ ...form, notas: e.target.value })}
-                    rows={3}
-                    className="input-base resize-none"
-                  />
+                  <div className="sm:col-span-4">
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Fecha Entrega
+                    </label>
+                    <input
+                      type="date"
+                      value={form.fechaEntrega}
+                      onChange={(e) => setForm({ ...form, fechaEntrega: e.target.value })}
+                      className="input-base"
+                    />
+                  </div>
+                  <div className="sm:col-span-6">
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Condiciones de Pago
+                    </label>
+                    <input
+                      type="text"
+                      value={form.condicionesPago}
+                      onChange={(e) => setForm({ ...form, condicionesPago: e.target.value })}
+                      className="input-base"
+                      placeholder="30 días"
+                    />
+                  </div>
+                  <div className="sm:col-span-12">
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Notas
+                    </label>
+                    <textarea
+                      value={form.notas}
+                      onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                      rows={3}
+                      className="input-base resize-none"
+                      placeholder="Observaciones de la orden"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

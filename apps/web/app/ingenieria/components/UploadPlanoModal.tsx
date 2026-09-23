@@ -55,12 +55,17 @@ export function UploadPlanoModal({
       formData.append('parteNumero', parteNumero);
       formData.append('version', version);
 
+      const token = localStorage.getItem('accessToken');
       const res = await fetch(`/api/ingenieria/${proyectoId}/planos`, {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Error al subir plano');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Error al subir plano');
+      }
 
       onUploadSuccess();
       onClose();

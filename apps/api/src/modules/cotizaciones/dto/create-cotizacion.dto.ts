@@ -14,8 +14,12 @@ import { Type } from 'class-transformer';
 
 export class DetalleCotizacionDto {
   @IsString()
+  @IsOptional()
+  numeroParte?: string;
+
+  @IsString()
   @IsNotEmpty()
-  piezaNombre: string;
+  piezaNombre!: string;
 
   @IsString()
   @IsOptional()
@@ -51,6 +55,10 @@ export class CreateCotizacionDto {
   @IsUUID()
   @IsNotEmpty()
   clienteId: string;
+
+  @IsUUID()
+  @IsOptional()
+  sucursalId?: string;
 
   @IsNumber()
   @IsOptional()
@@ -111,6 +119,6 @@ export class UpdateCotizacionDto {
 
   @IsString()
   @IsOptional()
-  @IsEnum(['borrador', 'enviada', 'aceptada', 'rechazada', 'cancelada'])
+  @IsEnum(['BORRADOR', 'ENVIADA', 'EN_REVISION', 'ACEPTADA', 'RECHAZADA', 'CANCELADA', 'CONVERTIDA'])
   estatus?: string;
 }

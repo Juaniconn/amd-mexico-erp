@@ -113,6 +113,17 @@ export interface OrdenCompraProveedor {
   notas?: string;
 }
 
+export type EstatusOrdenCompra = 'BORRADOR' | 'ENVIADA' | 'RECIBIDA' | 'CANCELADA';
+
+export interface DetalleOrdenCompra {
+  id?: string;
+  material?: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  importe: number;
+}
+
 export interface OrdenCompra {
   id: string;
   folio: string;
@@ -125,34 +136,60 @@ export interface OrdenCompra {
   moneda: string;
   subtotal: number;
   iva: number;
+  impuestos?: number;
   total: number;
   estatus: string;
   condicionesPago?: string;
   notas?: string;
   proveedores?: OrdenCompraProveedor[];
+  detalles?: DetalleOrdenCompra[];
   createdAt: string;
 }
 
 export interface Material {
   id: string;
   codigo: string;
-  descripcion: string;
-  tipo: string;
+  nombre: string;
+  descripcion?: string;
+  categoria: string;
   unidad: string;
-  stockActual: number;
-  stockMinimo: number;
-  costoUnitario?: number;
-  moneda: string;
+  stockActual: number | string;
+  stockMinimo: number | string;
+  ubicacion?: string;
+  precioUnitario?: number | string;
   activo: boolean;
   createdAt: string;
+  updatedAt?: string;
+  _count?: {
+    movimientos: number;
+  };
 }
+
+export interface MovimientoMaterial {
+  id: string;
+  materialId: string;
+  tipo: TipoMovimiento;
+  cantidad: number;
+  documento?: string;
+  notas?: string;
+  usuarioId?: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    apellido: string;
+    email: string;
+  };
+  createdAt: string;
+}
+
+export type TipoMovimiento = 'ENTRADA' | 'SALIDA' | 'AJUSTE';
 
 // ─── Producción ──────────────────────────────────────────
 
 export interface ParteOT {
   id: string;
   otId: string;
-  numeroParte: string;
+  numeroParte?: string;
   piezaNombre: string;
   descripcion?: string;
   cantidad: number;
@@ -185,9 +222,16 @@ export type EstatusParteOT =
   | 'PAUSADA'
   | 'EN_ESPERA_MATERIAL';
 
+export type EstatusOperacion =
+  | 'PENDIENTE'
+  | 'EN_PROCESO'
+  | 'COMPLETADA'
+  | 'RECHAZADA';
+
 export interface DetalleCotizacion {
   id: string;
   cotizacionId: string;
+  numeroParte?: string;
   piezaNombre: string;
   piezaDescripcion?: string;
   cantidad: number;
@@ -365,4 +409,41 @@ export interface IngenieriaStats {
   enDiseno: number;
   listosCotizar: number;
   liberados: number;
+}
+
+// ─── Facturación ──────────────────────────────────────────
+export type EstatusFactura = 'PENDIENTE' | 'PAGADA' | 'VENCIDA' | 'CANCELADA';
+
+export interface DetalleFactura {
+  id?: string;
+  facturaId?: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  importe: number;
+}
+
+export interface Factura {
+  id: string;
+  folio: string;
+  clienteId: string;
+  cliente?: { id: string; razonSocial: string; rfc?: string };
+  fecha: string;
+  fechaVencimiento?: string;
+  moneda: string;
+  tipoCambio?: number;
+  subtotal: number;
+  impuestos: number;
+  iva?: number;
+  total: number;
+  estatus: EstatusFactura;
+  notas?: string;
+  creadoPor?: string;
+  createdAt: string;
+  updatedAt: string;
+  detalles?: DetalleFactura[];
+  otId?: string;
+  ot?: { id: string; folio: string };
+  sucursalId?: string;
+  sucursal?: { id: string; nombre: string };
 }

@@ -31,7 +31,13 @@ import {
   Inbox,
   Mail,
   Calendar,
+  Key,
+  CheckCircle2,
+  XCircle,
+  Settings,
 } from 'lucide-react';
+
+type Role = 'ADMIN' | 'GERENTE' | 'VENDEDOR' | 'PRODUCCION' | 'CALIDAD' | 'COMPRAS' | 'OPERADOR';
 
 interface Usuario {
   id: string;
@@ -39,7 +45,7 @@ interface Usuario {
   nombre: string;
   apellido: string;
   username: string;
-  role: 'ADMIN' | 'OPERADOR' | 'SUPERVISOR';
+  role: Role;
   activo: boolean;
   ultimoAcceso: string | null;
   sucursalId: string | null;
@@ -53,18 +59,24 @@ interface UsuarioFormData {
   apellido: string;
   username: string;
   password: string;
-  role: 'ADMIN' | 'OPERADOR' | 'SUPERVISOR';
+  role: Role;
   sucursalId: string;
 }
 
-const ROLE_LABELS: Record<string, { label: string; variant: 'success' | 'warning' | 'secondary' }> = {
-  ADMIN: { label: 'Administrador', variant: 'success' },
-  SUPERVISOR: { label: 'Supervisor', variant: 'warning' },
-  OPERADOR: { label: 'Operador', variant: 'secondary' },
+const ROLE_LABELS: Record<string, { label: string; variant: 'success' | 'warning' | 'default' | 'destructive' | 'secondary'; descripcion: string }> = {
+  ADMIN: { label: 'Administrador', variant: 'destructive', descripcion: 'Acceso total al sistema' },
+  GERENTE: { label: 'Gerente', variant: 'success', descripcion: 'Gestión general y reportes' },
+  VENDEDOR: { label: 'Vendedor', variant: 'default', descripcion: 'Clientes y cotizaciones' },
+  PRODUCCION: { label: 'Producción', variant: 'warning', descripcion: 'Órdenes de trabajo y maquinaria' },
+  CALIDAD: { label: 'Calidad', variant: 'default', descripcion: 'Inspecciones y control de calidad' },
+  COMPRAS: { label: 'Compras', variant: 'warning', descripcion: 'Órdenes de compra y proveedores' },
+  OPERADOR: { label: 'Operador', variant: 'secondary', descripcion: 'Acceso básico a producción' },
 };
 
+const ROLES_ORDER: Role[] = ['ADMIN', 'GERENTE', 'VENDEDOR', 'PRODUCCION', 'CALIDAD', 'COMPRAS', 'OPERADOR'];
+
 function RoleBadge({ role }: { role: string }) {
-  const config = ROLE_LABELS[role] || { label: role, variant: 'secondary' as const };
+  const config = ROLE_LABELS[role] || { label: role, variant: 'secondary' as const, descripcion: '' };
   return (
     <Badge variant={config.variant}>
       {config.label}
@@ -154,9 +166,11 @@ function SearchFilterBar({
         className="input-base sm:w-40"
       >
         <option value="">Todos los roles</option>
-        <option value="ADMIN">Administrador</option>
-        <option value="SUPERVISOR">Supervisor</option>
-        <option value="OPERADOR">Operador</option>
+        {ROLES_ORDER.map((role) => (
+          <option key={role} value={role}>
+            {ROLE_LABELS[role].label}
+          </option>
+        ))}
       </select>
       <Button variant="outline" size="sm" onClick={onSearch} className="gap-2">
         <Search className="h-3.5 w-3.5" />
@@ -180,7 +194,7 @@ function FormModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -223,7 +237,7 @@ function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl">
         <p className="text-sm text-foreground">{message}</p>
         <div className="mt-4 flex justify-end gap-3">
@@ -246,20 +260,22 @@ function DetailModal({
   onClose,
   onEdit,
   onDelete,
+  onPermisos,
 }: {
   usuario: Usuario;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onPermisos: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-3">
             <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-              usuario.activo ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+              usuario.activo ? 'bg-brand-muted text-brand' : 'bg-muted text-muted-foreground'
             }`}>
               <span className="text-sm font-bold">
                 {usuario.nombre?.[0]}{usuario.apellido?.[0]}
@@ -351,6 +367,16 @@ function DetailModal({
             type="button"
             variant="outline"
             size="sm"
+            onClick={onPermisos}
+            className="gap-2"
+          >
+            <Key className="h-3.5 w-3.5" />
+            Permisos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={onDelete}
             className="gap-2 text-danger hover:text-danger"
           >
@@ -365,6 +391,149 @@ function DetailModal({
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal de Permisos ──────────────────────────────────
+
+interface PermisoItem {
+  modulo: string;
+  accion: string;
+  permitido: boolean;
+}
+
+interface PermisoCatalogoItem {
+  modulo: string;
+  descripcion: string;
+  acciones: string[];
+}
+
+function PermisosModal({ usuario, onClose }: { usuario: Usuario; onClose: () => void }) {
+  const [permisos, setPermisos] = useState<PermisoItem[]>([]);
+  const [catalogo, setCatalogo] = useState<PermisoCatalogoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [permisosData, catalogoData] = await Promise.all([
+          get<PermisoItem[]>(`/api/permisos/usuario/${usuario.id}`),
+          get<PermisoCatalogoItem[]>('/api/permisos/catalogo'),
+        ]);
+        setPermisos(permisosData);
+        setCatalogo(catalogoData);
+      } catch (err: any) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [usuario.id]);
+
+  const togglePermiso = async (modulo: string, accion: string, permitido: boolean) => {
+    setSaving(true);
+    try {
+      await post(`/api/permisos/usuario/${usuario.id}`, { modulo, accion, permitido });
+      setPermisos((prev) =>
+        prev.map((p) => (p.modulo === modulo && p.accion === accion ? { ...p, permitido } : p))
+      );
+    } catch (err: any) {
+      alert(err?.message || 'Error al actualizar permiso');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-2xl">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  const modulosUnicos = [...new Set(catalogo.map((c) => c.modulo))];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
+      <div className="my-auto flex max-h-[min(90vh,calc(100dvh-2rem))] w-full max-w-4xl flex-col rounded-xl border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <div>
+            <h2 className="text-lg font-semibold">Permisos de {usuario.nombre} {usuario.apellido}</h2>
+            <p className="text-sm text-muted-foreground">Rol: {ROLE_LABELS[usuario.role]?.label || usuario.role}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {usuario.role === 'ADMIN' ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-primary">
+                <Shield className="h-4 w-4" />
+                Administrador del sistema
+              </div>
+              <p className="mt-1 text-muted-foreground">
+                Los administradores tienen acceso total a todos los módulos y acciones.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {modulosUnicos.map((modulo) => {
+                const moduloInfo = catalogo.find((c) => c.modulo === modulo);
+                const acciones = moduloInfo?.acciones || [];
+                const permisosModulo = permisos.filter((p) => p.modulo === modulo);
+
+                return (
+                  <div key={modulo} className="rounded-lg border border-border">
+                    <div className="border-b border-border bg-muted/50 px-4 py-2">
+                      <h3 className="text-sm font-semibold capitalize">{moduloInfo?.descripcion || modulo}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                      {acciones.map((accion) => {
+                        const permiso = permisosModulo.find((p) => p.accion === accion);
+                        const permitido = permiso?.permitido ?? false;
+
+                        return (
+                          <button
+                            key={accion}
+                            onClick={() => !saving && togglePermiso(modulo, accion, !permitido)}
+                            disabled={saving}
+                            className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors ${
+                              permitido
+                                ? 'border-success/30 bg-success/5 text-success'
+                                : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted'
+                            }`}
+                          >
+                            {permitido ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5" />
+                            )}
+                            <span className="capitalize">{accion.replace(/_/g, ' ')}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-border p-4">
+          <Button onClick={onClose} className="w-full">
+            Cerrar
           </Button>
         </div>
       </div>
@@ -390,8 +559,10 @@ function UsuariosContent() {
   const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showPermisosModal, setShowPermisosModal] = useState(false);
   const [editingUser, setEditingUser] = useState<Usuario | null>(null);
   const [detailUsuario, setDetailUsuario] = useState<Usuario | null>(null);
+  const [permisosUsuario, setPermisosUsuario] = useState<Usuario | null>(null);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -499,6 +670,12 @@ function UsuariosContent() {
     setShowDetailModal(true);
   }
 
+  function openPermisosModal(u: Usuario) {
+    setPermisosUsuario(u);
+    setShowPermisosModal(true);
+    setShowDetailModal(false);
+  }
+
   async function handleDeleteFromDetail() {
     if (!detailUsuario) return;
     if (!confirm('¿Está seguro de eliminar este usuario?')) return;
@@ -585,7 +762,7 @@ function UsuariosContent() {
               <p className="section-title">Total</p>
               <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{totalUsuarios}</p>
             </div>
-            <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand-muted text-brand">
               <Users className="h-5 w-5" />
             </div>
           </div>
@@ -596,7 +773,7 @@ function UsuariosContent() {
               <p className="section-title">Activos</p>
               <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{activos}</p>
             </div>
-            <div className="ml-3 shrink-0 rounded-lg p-2 bg-success/10 text-success">
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-success-muted text-success">
               <UserCheck className="h-5 w-5" />
             </div>
           </div>
@@ -607,7 +784,7 @@ function UsuariosContent() {
               <p className="section-title">Admins</p>
               <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{admins}</p>
             </div>
-            <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand/10 text-brand">
+            <div className="ml-3 shrink-0 rounded-lg p-2 bg-brand-muted text-brand">
               <Shield className="h-5 w-5" />
             </div>
           </div>
@@ -658,7 +835,7 @@ function UsuariosContent() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                    user.activo ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+                    user.activo ? 'bg-brand-muted text-brand' : 'bg-muted text-muted-foreground'
                   }`}>
                     <span className="text-sm font-bold">
                       {user.nombre?.[0]}{user.apellido?.[0]}
@@ -766,6 +943,14 @@ function UsuariosContent() {
           onClose={() => { setShowDetailModal(false); setDetailUsuario(null); }}
           onEdit={openEditFromDetail}
           onDelete={handleDeleteFromDetail}
+          onPermisos={() => openPermisosModal(detailUsuario)}
+        />
+      )}
+
+      {showPermisosModal && permisosUsuario && (
+        <PermisosModal
+          usuario={permisosUsuario}
+          onClose={() => { setShowPermisosModal(false); setPermisosUsuario(null); }}
         />
       )}
 
@@ -855,12 +1040,14 @@ function UsuariosContent() {
             <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-muted-foreground">Rol *</label>
             <select
               value={formData.role}
-              onChange={e => setFormData({ ...formData, role: e.target.value as Usuario['role'] })}
+              onChange={e => setFormData({ ...formData, role: e.target.value as Role })}
               className="input-base"
             >
-              <option value="OPERADOR">Operador</option>
-              <option value="SUPERVISOR">Supervisor</option>
-              <option value="ADMIN">Administrador</option>
+              {ROLES_ORDER.map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABELS[role].label} — {ROLE_LABELS[role].descripcion}
+                </option>
+              ))}
             </select>
           </div>
         </FormModal>

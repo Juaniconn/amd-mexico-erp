@@ -80,6 +80,10 @@ services:
       JWT_REFRESH_EXPIRES_IN: 7d
       NODE_ENV: production
       API_PORT: 3001
+      # Cursor Cloud Agents (user key). Set in infra/docker/.env or host env.
+      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
+    env_file:
+      - ../../apps/api/.env
     depends_on:
       db:
         condition: service_healthy

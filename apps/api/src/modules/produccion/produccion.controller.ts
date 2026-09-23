@@ -6,18 +6,23 @@ import {
   Param,
   Put,
   Patch,
+  Delete,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ProduccionService } from './produccion.service';
 import { CreateOrdenTrabajoDto, UpdateOrdenTrabajoDto, UpdateOperacionDto } from './dto/create-orden-trabajo.dto';
+import { CreateOperacionDto } from './dto/create-operacion.dto';
 import { CreateOrdenTrabajoFromQuoteDto } from './dto/create-orden-trabajo-from-quote.dto';
 import { AsignarParteDto } from './dto/asignar-parte.dto';
 import { UpdateEstatusParteDto } from './dto/update-estatus-parte.dto';
+import { CreateBomItemDto, UpdateBomItemDto, ReplaceBomDto } from './dto/bom.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { resolveSucursalFilter } from '../../common/sucursal-scope';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -51,14 +56,17 @@ export class ProduccionController {
   @Get('ordenes-trabajo')
   @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
   async findAllOrdenesTrabajo(
+    @CurrentUser() user: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('estatus') estatus?: string,
+    @Query('sucursalId') sucursalId?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.produccionService.findAllOrdenesTrabajo(pageNum, limitNum, search, estatus);
+    const sid = resolveSucursalFilter(user, sucursalId);
+    return this.produccionService.findAllOrdenesTrabajo(pageNum, limitNum, search, estatus, sid);
   }
 
   @Get('ordenes-trabajo/:id')
@@ -67,7 +75,53 @@ export class ProduccionController {
     return this.produccionService.findOneOrdenTrabajo(id);
   }
 
-  @Put('ordenes-trabajo/:id')
+  @Get('ordenes-trabajo/:id/costeo')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async getCosteo(
+    @Param('id') id: string,
+    @Query('tarifaHora') tarifaHora?: string,
+    @Query('overheadPct') overheadPct?: string,
+  ) {
+    const tarifa = tarifaHora ? parseFloat(tarifaHora) : 350;
+    const overhead = overheadPct ? parseFloat(overheadPct) : 15;
+    return this.produccionService.getCosteoOT(id, tarifa, overhead);
+  }
+
+  @Get('ordenes-trabajo/:id/bom')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async listBom(@Param('id') id: string) {
+    return this.produccionService.listBom(id);
+  }
+
+  @Post('ordenes-trabajo/:id/bom')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async addBomItem(@Param('id') id: string, @Body() dto: CreateBomItemDto) {
+    return this.produccionService.addBomItem(id, dto);
+  }
+
+  @Put('ordenes-trabajo/:id/bom')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async replaceBom(@Param('id') id: string, @Body() dto: ReplaceBomDto) {
+    return this.produccionService.replaceBom(id, dto.items || []);
+  }
+
+  @Patch('ordenes-trabajo/:id/bom/:itemId')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async updateBomItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateBomItemDto,
+  ) {
+    return this.produccionService.updateBomItem(id, itemId, dto);
+  }
+
+  @Delete('ordenes-trabajo/:id/bom/:itemId')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async deleteBomItem(@Param('id') id: string, @Param('itemId') itemId: string) {
+    return this.produccionService.deleteBomItem(id, itemId);
+  }
+
+  @Patch('ordenes-trabajo/:id')
   @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
   async updateOrdenTrabajo(@Param('id') id: string, @Body() dto: UpdateOrdenTrabajoDto) {
     return this.produccionService.updateOrdenTrabajo(id, dto);
@@ -91,10 +145,22 @@ export class ProduccionController {
     return this.produccionService.descontarMaterialesOT(id);
   }
 
+  @Post('ordenes-trabajo/:id/generar-retrabajo')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.CALIDAD)
+  async generarRetrabajo(@Param('id') id: string, @Body() body: { notas?: string }) {
+    return this.produccionService.generarRetrabajo(id, body.notas);
+  }
+
   @Get('partes-ot/orden-trabajo/:id')
   @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
   async findPartesByOT(@Param('id') id: string) {
     return this.produccionService.findPartesByOT(id);
+  }
+
+  @Get('partes-ot/orden-trabajo/:otId/parte/:numeroParte')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
+  async findParteByNumeroParte(@Param('otId') otId: string, @Param('numeroParte') numeroParte: string) {
+    return this.produccionService.findParteByNumeroParte(otId, numeroParte);
   }
 
   @Get('operaciones')
@@ -119,5 +185,37 @@ export class ProduccionController {
   @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
   async updateOperacion(@Param('id') id: string, @Body() dto: UpdateOperacionDto) {
     return this.produccionService.updateOperacion(id, dto);
+  }
+
+  @Patch('operaciones/:id/programar')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async programarOperacion(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      fechaInicioProgramada: string;
+      fechaFinProgramada?: string;
+      maquinaId?: string;
+    },
+  ) {
+    return this.produccionService.programarOperacion(id, body);
+  }
+
+  @Post('partes-ot/:parteId/operaciones')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION)
+  async addOperacion(@Param('parteId') parteId: string, @Body() dto: CreateOperacionDto) {
+    return this.produccionService.addOperacion(parteId, dto);
+  }
+
+  @Get('maquinas')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
+  async findAllMaquinas() {
+    return this.produccionService.findAllMaquinas();
+  }
+
+  @Get('usuarios/operadores')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.PRODUCCION, Role.OPERADOR)
+  async findAllOperadores() {
+    return this.produccionService.findAllOperadores();
   }
 }

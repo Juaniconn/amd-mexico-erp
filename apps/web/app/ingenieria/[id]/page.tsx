@@ -128,6 +128,21 @@ export default function IngenieriaDetallePage() {
           body: JSON.stringify({ status: 'LISTO_COTIZAR' }),
         });
         if (!res.ok) throw new Error();
+      } else if (action === 'cotizar') {
+        url += '/cotizar';
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'Error al cotizar');
+        }
+        const data = await res.json();
+        if (data?.cotizacion?.id) {
+          router.push(`/cotizaciones/${data.cotizacion.id}`);
+          return;
+        }
       } else if (action === 'liberar') {
         url += '/liberar';
         const res = await fetch(url, {
@@ -137,8 +152,8 @@ export default function IngenieriaDetallePage() {
         if (!res.ok) throw new Error();
       }
       await fetchProyecto();
-    } catch (err) {
-      setError('Error al realizar acción');
+    } catch (err: any) {
+      setError(err?.message || 'Error al realizar acción');
     } finally {
       setActionLoading('');
     }
@@ -146,6 +161,10 @@ export default function IngenieriaDetallePage() {
 
   const canStartDesign = proyecto?.status === 'PENDIENTE_PLANOS';
   const canMarkReadyToQuote = proyecto?.status === 'EN_DISENO';
+  const canCotizar =
+    proyecto?.status === 'LISTO_COTIZAR' ||
+    proyecto?.status === 'EN_DISENO' ||
+    proyecto?.status === 'PENDIENTE_PLANOS';
   const canRelease = proyecto?.status === 'LISTO_COTIZAR' || proyecto?.status === 'COTIZADO';
 
   if (loading) {
@@ -276,6 +295,18 @@ export default function IngenieriaDetallePage() {
                   <DollarSign className="w-4 h-4 mr-2" />
                 )}
                 Marcar Listo para Cotizar
+              </Button>
+              <Button
+                className="w-full justify-start"
+                disabled={!canCotizar || !!actionLoading}
+                onClick={() => handleAction('cotizar')}
+              >
+                {actionLoading === 'cotizar' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4 mr-2" />
+                )}
+                Generar Cotización
               </Button>
               <Button
                 className="w-full justify-start"

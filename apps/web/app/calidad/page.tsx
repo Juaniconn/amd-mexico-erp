@@ -89,7 +89,7 @@ const TIPOS = [
 ];
 
 function getResultadoBadgeVariant(resultado: string): 'success' | 'destructive' | 'warning' | 'secondary' {
-  switch (resultado) {
+  switch ((resultado || '').toLowerCase()) {
     case 'aprobado': return 'success';
     case 'rechazado': return 'destructive';
     case 'rework': return 'warning';
@@ -98,7 +98,8 @@ function getResultadoBadgeVariant(resultado: string): 'success' | 'destructive' 
 }
 
 function getResultadoLabel(resultado: string) {
-  return RESULTADOS.find((x) => x.value === resultado)?.label || resultado;
+  const low = (resultado || '').toLowerCase();
+  return RESULTADOS.find((x) => x.value === low)?.label || resultado;
 }
 
 function formatDate(dateStr: string) {
@@ -174,15 +175,15 @@ function DetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-3">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-              item.resultado === 'aprobado' ? 'bg-success/10 text-success' :
-              item.resultado === 'rechazado' ? 'bg-destructive/10 text-destructive' :
-              item.resultado === 'rework' ? 'bg-warning/10 text-warning' :
+              item.resultado?.toLowerCase() === 'aprobado' ? 'bg-success-muted text-success' :
+              item.resultado?.toLowerCase() === 'rechazado' ? 'bg-destructive/10 text-destructive' :
+              item.resultado?.toLowerCase() === 'rework' ? 'bg-warning-muted text-warning' :
               'bg-muted text-muted-foreground'
             }`}>
               <ClipboardCheck className="h-5 w-5" />
@@ -400,7 +401,13 @@ function CalidadContent() {
     setForm({
       operacionId: item.operacionId || '',
       ordenTrabajoId: item.ordenTrabajoId || '',
-      resultado: item.resultado || 'aprobado',
+      resultado: (item.resultado || 'aprobado').toLowerCase() === 'aprobado'
+        ? 'aprobado'
+        : (item.resultado || '').toLowerCase() === 'rechazado'
+          ? 'rechazado'
+          : (item.resultado || '').toLowerCase() === 'rework'
+            ? 'rework'
+            : 'aprobado',
       defectos: item.defectos || '',
       observaciones: item.observaciones || '',
     });
@@ -547,7 +554,7 @@ function CalidadContent() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-muted text-brand">
               <ListChecks className="h-5 w-5" />
             </div>
             <div>
@@ -558,7 +565,7 @@ function CalidadContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-muted text-success">
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
@@ -580,7 +587,7 @@ function CalidadContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-muted text-warning">
               <Percent className="h-5 w-5" />
             </div>
             <div>
@@ -672,9 +679,9 @@ function CalidadContent() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                    item.resultado === 'aprobado' ? 'bg-success/10 text-success' :
+                    item.resultado === 'aprobado' ? 'bg-success-muted text-success' :
                     item.resultado === 'rechazado' ? 'bg-destructive/10 text-destructive' :
-                    item.resultado === 'rework' ? 'bg-warning/10 text-warning' :
+                    item.resultado === 'rework' ? 'bg-warning-muted text-warning' :
                     'bg-muted text-muted-foreground'
                   }`}>
                     <ClipboardCheck className="h-5 w-5" />
@@ -800,7 +807,7 @@ function CalidadContent() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
               <h2 className="text-lg font-semibold text-foreground">

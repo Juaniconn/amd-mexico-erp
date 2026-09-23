@@ -1,0 +1,13 @@
+FROM node:20-bookworm-slim
+WORKDIR /app/apps/web
+
+# Copiar el build ya generado (contexto: apps/web)
+COPY .next ./
+COPY package.json ./
+COPY next.config.js ./
+
+# Instalar solo dependencias de producción
+RUN npm install --production
+
+EXPOSE 3000
+CMD ["node", "node_modules/next/dist/bin/next", "start"]

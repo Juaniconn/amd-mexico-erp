@@ -49,7 +49,6 @@ export class ClientesService {
         },
         include: {
           cotizaciones: true,
-          ordenesCompra: true,
         },
       });
 
@@ -89,7 +88,7 @@ export class ClientesService {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { cotizaciones: true, ordenesCompra: true },
+            select: { cotizaciones: true },
           },
         },
       }),
@@ -112,10 +111,6 @@ export class ClientesService {
       where: { id },
       include: {
         cotizaciones: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
-        ordenesCompra: {
           orderBy: { createdAt: 'desc' },
           take: 5,
         },
@@ -147,7 +142,6 @@ export class ClientesService {
         data: updateData,
         include: {
           cotizaciones: true,
-          ordenesCompra: true,
         },
       });
 
@@ -178,7 +172,7 @@ export class ClientesService {
         where: { id },
         include: {
           _count: {
-            select: { cotizaciones: true, ordenesCompra: true },
+            select: { cotizaciones: true },
           },
         },
       });
@@ -190,7 +184,7 @@ export class ClientesService {
         });
       }
 
-      if (cliente._count.cotizaciones > 0 || cliente._count.ordenesCompra > 0) {
+      if (cliente._count.cotizaciones > 0) {
         throw new BadRequestException({
           message: 'No se puede eliminar un cliente con cotizaciones u órdenes de compra asociadas',
           statusCode: HttpStatus.BAD_REQUEST,

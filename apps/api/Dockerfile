@@ -1,14 +1,14 @@
 FROM node:20-bookworm-slim
 WORKDIR /app
 
-# Instalar libssl3 (requerido por Prisma query engine en ARM64)
+# Instalar libssl3 (requerido por Prisma query engine)
 RUN apt-get update && apt-get install -y libssl3 && rm -rf /var/lib/apt/lists/*
 
 # Copiar node_modules ya instalados (con symlinks de pnpm del host)
 COPY node_modules ./node_modules
 COPY apps/api/node_modules ./apps/api/node_modules
 
-# Copilar app pre-compilada y prisma schema
+# Copiar app pre-compilada y prisma schema
 COPY apps/api/dist ./apps/api/dist
 COPY apps/api/prisma ./apps/api/prisma
 COPY packages/shared ./packages/shared

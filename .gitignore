@@ -51,6 +51,14 @@ minio-data/
 *.bak
 *.backup
 *.old
+backups/
+
+# Local lockfiles (monorepo uses root pnpm-lock.yaml)
+apps/*/package-lock.json
+package-lock.json
+
+# Next/TS incremental
+*.tsbuildinfo
 
 # Secrets and credentials
 secrets/
@@ -62,3 +70,9 @@ credentials/
 # Subagent generated reports
 AUDIT_REPORT.md
 SECURITY_REPORT.md
+
+# Agency Agents (Cursor rules; regenerate from ~/agency-agents)
+.cursor/
+!.cursor/rules/
+.cursor/rules/*
+!.cursor/rules/00-agency-orchestrator.mdc

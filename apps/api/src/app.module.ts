@@ -14,14 +14,23 @@ import { ConfiguracionModule } from './modules/configuracion/configuracion.modul
 import { IngenieriaModule } from './modules/ingenieria/ingenieria.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { FacturacionModule } from './modules/facturacion/facturacion.module';
+import { VpsModule } from './modules/vps/vps.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { MaquinariaModule } from './modules/maquinaria/maquinaria.module';
+import { AgentesModule } from './modules/agentes/agentes.module';
+import { AgentesCursorModule } from './modules/agentes-cursor/agentes-cursor.module';
+import { TransferenciasModule } from './modules/transferencias/transferencias.module';
+import { EmbarquesModule } from './modules/embarques/embarques.module';
+import { StorageModule } from './common/storage.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['.env', 'apps/api/.env'],
     }),
     PrismaModule,
+    StorageModule,
     AuthModule,
     UsuariosModule,
     ClientesModule,
@@ -35,6 +44,13 @@ import { FacturacionModule } from './modules/facturacion/facturacion.module';
     ConfiguracionModule,
     IngenieriaModule,
     FacturacionModule,
+    VpsModule,
+    DashboardModule,
+    MaquinariaModule,
+    AgentesModule,
+    AgentesCursorModule,
+    TransferenciasModule,
+    EmbarquesModule,
   ],
 })
 export class AppModule {}

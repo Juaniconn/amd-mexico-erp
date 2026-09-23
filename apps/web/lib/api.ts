@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export interface OrdenTrabajo {
   id: string;
@@ -66,7 +66,20 @@ async function apiClient<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_URL}${path}`;
+  let finalPath = path;
+  if (typeof window !== 'undefined') {
+    const filter = localStorage.getItem('sucursalFilter'); // 'all' | uuid
+    const userSuc = localStorage.getItem('sucursalId');
+    const sid = filter && filter !== 'all' ? filter : null;
+    // Only auto-append for list-ish GET paths without existing sucursalId
+    const method = (options.method || 'GET').toUpperCase();
+    if (method === 'GET' && sid && !finalPath.includes('sucursalId=')) {
+      finalPath += finalPath.includes('?') ? `&sucursalId=${sid}` : `?sucursalId=${sid}`;
+    }
+    // Non-admin users without filter still get scoped by API via JWT user.sucursalId
+    void userSuc;
+  }
+  const url = `${API_URL}${finalPath}`;
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
   const headers: Record<string, string> = {
@@ -185,6 +198,10 @@ export async function updateIngenieriaProyecto(
 
 export async function liberarIngenieriaProyecto(id: string): Promise<any> {
   return post(`/api/ingenieria/${id}/liberar`);
+}
+
+export async function cotizarIngenieriaProyecto(id: string): Promise<any> {
+  return post(`/api/ingenieria/${id}/cotizar`);
 }
 
 export async function uploadPlano(

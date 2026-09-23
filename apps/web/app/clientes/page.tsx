@@ -157,7 +157,7 @@ function FormModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:items-center animate-fade-in">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -390,7 +390,7 @@ function ClientesContent() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-brand/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-muted text-brand">
               <Users className="h-5 w-5" />
             </div>
             <div>
@@ -401,7 +401,7 @@ function ClientesContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-success/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10 text-success">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-muted text-success">
               <UserCheck className="h-5 w-5" />
             </div>
             <div>
@@ -423,7 +423,7 @@ function ClientesContent() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:border-warning/30 hover:shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 text-warning">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-muted text-warning">
               <FileText className="h-5 w-5" />
             </div>
             <div>
@@ -482,7 +482,7 @@ function ClientesContent() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-                    c.activo !== false ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'
+                    c.activo !== false ? 'bg-brand-muted text-brand' : 'bg-muted text-muted-foreground'
                   }`}>
                     <Building2 className="h-5 w-5" />
                   </div>

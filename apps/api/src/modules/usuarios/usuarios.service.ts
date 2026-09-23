@@ -8,13 +8,17 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Role } from '@prisma/client';
+import { PermisosService } from './permisos.service';
 import * as bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
 
 @Injectable()
 export class UsuariosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permisosService: PermisosService,
+  ) {}
 
   async findAll(page = 1, limit = 10, search?: string) {
     const skip = (page - 1) * limit;
@@ -132,6 +136,9 @@ export class UsuariosService {
       },
     });
 
+    // Inicializar permisos por defecto según el rol
+    await this.permisosService.inicializarPermisosUsuario(usuario.id, usuario.role);
+
     return usuario;
   }
 
@@ -199,7 +206,7 @@ export class UsuariosService {
   async updateRole(id: string, role: Role) {
     await this.findOne(id);
 
-    return this.prisma.usuario.update({
+    const usuario = await this.prisma.usuario.update({
       where: { id },
       data: { role },
       select: {
@@ -214,6 +221,14 @@ export class UsuariosService {
         updatedAt: true,
       },
     });
+
+    // Re-inicializar permisos según el nuevo rol
+    await this.prisma.usuarioPermiso.deleteMany({
+      where: { usuarioId: id },
+    });
+    await this.permisosService.inicializarPermisosUsuario(id, role);
+
+    return usuario;
   }
 
   async updatePassword(id: string, password: string) {

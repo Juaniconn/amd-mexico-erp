@@ -16,6 +16,12 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { ProduccionService } from '../produccion/produccion.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  resolveSucursalFilter,
+  requireSucursalId,
+  AuthUser,
+} from '../../common/sucursal-scope';
 
 @Controller('cotizaciones')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -27,20 +33,30 @@ export class CotizacionesController {
 
   @Post()
   @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
-  async create(@Body() createCotizacionDto: CreateCotizacionDto) {
-    return this.cotizacionesService.create(createCotizacionDto);
+  async create(
+    @Body() createCotizacionDto: CreateCotizacionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const sid = requireSucursalId(user, createCotizacionDto.sucursalId);
+    return this.cotizacionesService.create({
+      ...createCotizacionDto,
+      sucursalId: sid,
+    });
   }
 
   @Get()
   @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
   async findAll(
+    @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('sucursalId') sucursalId?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.cotizacionesService.findAll(pageNum, limitNum, search);
+    const sid = resolveSucursalFilter(user, sucursalId);
+    return this.cotizacionesService.findAll(pageNum, limitNum, search, sid);
   }
 
   @Get(':id')
@@ -70,9 +86,18 @@ export class CotizacionesController {
     // 1. Cambiar estatus a ACEPTADA
     await this.cotizacionesService.update(id, { estatus: 'ACEPTADA' } as any);
     // 2. Convertir a OT
-    return this.produccionService.convertirCotizacionAOrdenTrabajo({
+    const ot = await this.produccionService.convertirCotizacionAOrdenTrabajo({
       cotizacionId: id,
       responsableId: body.responsableId,
     });
+    // 3. Actualizar estatus a CONVERTIDA
+    await this.cotizacionesService.update(id, { estatus: 'CONVERTIDA' } as any);
+    return { id: ot.id, folio: ot.folio, message: 'Cotización aprobada y convertida a OT' };
+  }
+
+  @Get('cotizacion/:id/ot')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
+  async getOTByCotizacion(@Param('id') id: string) {
+    return this.produccionService.findByCotizacionId(id);
   }
 }

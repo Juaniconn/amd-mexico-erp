@@ -39,6 +39,9 @@ export class CotizacionesService {
         data: {
           folio,
           cliente: { connect: { id: data.clienteId } },
+          ...(data.sucursalId
+            ? { sucursal: { connect: { id: data.sucursalId } } }
+            : {}),
           validez: data.validez || 30,
           tipoCambio: data.tipoCambio
             ? new Prisma.Decimal(data.tipoCambio)
@@ -51,6 +54,7 @@ export class CotizacionesService {
           notas: data.notas,
           detalles: {
             create: data.detalles.map((d) => ({
+              numeroParte: d.numeroParte,
               piezaNombre: d.piezaNombre,
               piezaDescripcion: d.piezaDescripcion,
               cantidad: d.cantidad,
@@ -85,18 +89,21 @@ export class CotizacionesService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10, search?: string) {
+  async findAll(page: number = 1, limit: number = 10, search?: string, sucursalId?: string) {
     const skip = (page - 1) * limit;
 
-    const where: Prisma.CotizacionWhereInput = search
-      ? {
-          OR: [
-            { folio: { contains: search, mode: 'insensitive' } },
-            { cliente: { razonSocial: { contains: search, mode: 'insensitive' } } },
-            { cliente: { ciudad: { contains: search, mode: 'insensitive' } } },
-          ],
-        }
-      : {};
+    const where: Prisma.CotizacionWhereInput = {
+      ...(sucursalId ? { sucursalId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { folio: { contains: search, mode: 'insensitive' } },
+              { cliente: { razonSocial: { contains: search, mode: 'insensitive' } } },
+              { cliente: { ciudad: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
 
     const [cotizaciones, total] = await Promise.all([
       this.prisma.cotizacion.findMany({
@@ -191,6 +198,7 @@ export class CotizacionesService {
           total: new Prisma.Decimal(subtotal + iva),
           detalles: {
             create: data.detalles.map((d) => ({
+              numeroParte: d.numeroParte,
               piezaNombre: d.piezaNombre,
               piezaDescripcion: d.piezaDescripcion,
               cantidad: d.cantidad,

@@ -312,6 +312,143 @@ export class IngenieriaService {
     return proyecto;
   }
 
+  /**
+   * Crea cotización borrador desde procesos/planos del proyecto.
+   * Estatus proyecto → COTIZADO.
+   */
+  async crearCotizacionDesdeProyecto(id: string, userId?: string) {
+    const proyecto = await this.prisma.ingenieriaProyecto.findUnique({
+      where: { id },
+      include: {
+        procesos: { orderBy: { secuencia: 'asc' } },
+        planos: { where: { estatus: 'ACTIVO' }, orderBy: { parteNumero: 'asc' } },
+      },
+    });
+
+    if (!proyecto) {
+      throw new NotFoundException({
+        message: 'Proyecto de ingeniería no encontrado',
+        statusCode: HttpStatus.NOT_FOUND,
+      });
+    }
+
+    if (
+      proyecto.status !== 'LISTO_COTIZAR' &&
+      proyecto.status !== 'EN_DISENO' &&
+      proyecto.status !== 'PENDIENTE_PLANOS'
+    ) {
+      throw new BadRequestException({
+        message: `No se puede cotizar desde estatus ${proyecto.status}`,
+        statusCode: HttpStatus.BAD_REQUEST,
+      });
+    }
+
+    // Agrupar por parte: procesos suman costo; si no hay procesos, una línea por plano
+    const partes = new Map<
+      string,
+      { nombre: string; costo: number; tiempo: number; proceso: string }
+    >();
+
+    for (const proc of proyecto.procesos) {
+      const key = proc.parteNumero || 'GENERAL';
+      const cur = partes.get(key) || {
+        nombre: key,
+        costo: 0,
+        tiempo: 0,
+        proceso: '',
+      };
+      cur.costo += Number(proc.costoEstimado || 0);
+      cur.tiempo += Number(proc.tiempoEstimado || 0);
+      cur.proceso = cur.proceso
+        ? `${cur.proceso}; ${proc.proceso}`
+        : proc.proceso;
+      partes.set(key, cur);
+    }
+
+    if (partes.size === 0) {
+      for (const plano of proyecto.planos) {
+        const key = plano.parteNumero || 'GENERAL';
+        if (!partes.has(key)) {
+          partes.set(key, {
+            nombre: key,
+            costo: 0,
+            tiempo: 0,
+            proceso: 'Por cotizar',
+          });
+        }
+      }
+    }
+
+    if (partes.size === 0) {
+      partes.set('GENERAL', {
+        nombre: proyecto.nombre,
+        costo: 0,
+        tiempo: 0,
+        proceso: 'Ingeniería',
+      });
+    }
+
+    const year = new Date().getFullYear();
+    const prefix = `COT-${year}-`;
+    const last = await this.prisma.cotizacion.findFirst({
+      where: { folio: { startsWith: prefix } },
+      orderBy: { folio: 'desc' },
+    });
+    let n = 1;
+    if (last) {
+      const partsFolio = last.folio.split('-');
+      n = (parseInt(partsFolio[partsFolio.length - 1], 10) || 0) + 1;
+    }
+    const folio = `${prefix}${String(n).padStart(4, '0')}`;
+
+    const detallesArr = Array.from(partes.entries()).map(([key, v]) => {
+      const precio = v.costo > 0 ? v.costo : 0;
+      return {
+        numeroParte: key,
+        piezaNombre: v.nombre,
+        piezaDescripcion: `Desde ingeniería ${proyecto.codigo}`,
+        cantidad: 1,
+        unidad: 'PZA',
+        precioUnitario: new Prisma.Decimal(precio),
+        subtotal: new Prisma.Decimal(precio),
+        tiempoEstimado: v.tiempo ? new Prisma.Decimal(v.tiempo) : null,
+        procesoRequerido: v.proceso || null,
+      };
+    });
+
+    const subtotal = detallesArr.reduce((s, d) => s + Number(d.precioUnitario), 0);
+    const iva = subtotal * 0.16;
+    const total = subtotal + iva;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const cotizacion = await tx.cotizacion.create({
+        data: {
+          folio,
+          clienteId: proyecto.clienteId,
+          sucursalId: proyecto.sucursalId,
+          ingenieriaProyectoId: proyecto.id,
+          creadoPor: userId,
+          subtotal: new Prisma.Decimal(subtotal),
+          iva: new Prisma.Decimal(iva),
+          total: new Prisma.Decimal(total),
+          estatus: 'BORRADOR',
+          notas: `Generada desde proyecto ${proyecto.codigo}`,
+          detalles: { create: detallesArr },
+        },
+        include: { detalles: true, cliente: true },
+      });
+
+      const updated = await tx.ingenieriaProyecto.update({
+        where: { id },
+        data: { status: 'COTIZADO' },
+      });
+
+      return { cotizacion, proyecto: updated };
+    });
+
+    return result;
+  }
+
   async uploadPlano(
     proyectoId: string,
     parteNumero: string,
