@@ -27,8 +27,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { IngenieriaProyecto, IngenieriaStats, EnumIngenieriaEstatus } from '@/types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+import { resolveApiUrl } from '@/lib/api';
 
 function getBadgeVariant(status: EnumIngenieriaEstatus): string {
   const variants: Record<EnumIngenieriaEstatus, string> = {
@@ -68,7 +67,7 @@ export default function IngenieriaPage() {
       const params = new URLSearchParams({ page: '1', limit: '50' });
       if (search) params.set('search', search);
 
-      const res = await fetch(`${API_URL}/ingenieria?${params}`, {
+      const res = await fetch(resolveApiUrl(`/api/ingenieria?${params}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -85,7 +84,7 @@ export default function IngenieriaPage() {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_URL}/ingenieria/stats`, {
+      const res = await fetch(resolveApiUrl('/api/ingenieria/stats'), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {

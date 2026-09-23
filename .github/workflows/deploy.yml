@@ -55,7 +55,8 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm --filter api exec prisma generate
           pnpm --filter api build
-          NEXT_PUBLIC_API_URL=/api pnpm --filter web build
+          # Same-origin: do NOT set NEXT_PUBLIC_API_URL=/api (doubles to /api/api)
+          NEXT_PUBLIC_API_URL= pnpm --filter web build
 
           docker cp apps/api/dist/. amd-erp-api:/app/apps/api/dist/
           if [ -f apps/api/.env ]; then

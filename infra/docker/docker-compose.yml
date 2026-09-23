@@ -98,7 +98,9 @@ services:
     container_name: amd-erp-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://api:3001
+      # Empty for browser same-origin; never http://api:3001 (not resolvable in browser)
+      # and never /api (paths already include /api → would become /api/api).
+      NEXT_PUBLIC_API_URL: ""
       NODE_ENV: production
     ports:
       - "3000:3000"

@@ -1,4 +1,39 @@
+/**
+ * Base for API calls.
+ *
+ * Convention (permanent):
+ * - Call sites always use paths that already include the Nest prefix: `/api/...`
+ * - NEXT_PUBLIC_API_URL is either empty (same-origin via nginx) or an origin
+ *   without `/api` (e.g. `https://tunnel.example` or `http://localhost:3001`).
+ * - Never set NEXT_PUBLIC_API_URL=/api — that produced `/api/api/...` 404s.
+ */
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+/**
+ * Join base + path without doubling `/api`.
+ * Defensive against misconfigured NEXT_PUBLIC_API_URL ending in `/api`.
+ */
+export function resolveApiUrl(
+  path: string,
+  base: string = API_URL,
+): string {
+  const rawBase = String(base ?? '')
+    .trim()
+    .replace(/\/+$/, '');
+  let p = String(path ?? '').trim();
+  if (!p) return rawBase || '/';
+  if (/^https?:\/\//i.test(p)) return p;
+  if (!p.startsWith('/')) p = `/${p}`;
+
+  // base=/api + path=/api/foo  → /api/foo
+  // base=https://x/api + path=/api/foo → https://x/api/foo
+  if (rawBase.endsWith('/api') && (p === '/api' || p.startsWith('/api/'))) {
+    p = p.slice(4) || '/';
+  }
+
+  if (!rawBase) return p;
+  return `${rawBase}${p}`;
+}
 
 export interface OrdenTrabajo {
   id: string;
@@ -79,7 +114,7 @@ async function apiClient<T = any>(
     // Non-admin users without filter still get scoped by API via JWT user.sucursalId
     void userSuc;
   }
-  const url = `${API_URL}${finalPath}`;
+  const url = resolveApiUrl(finalPath);
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
   const headers: Record<string, string> = {
@@ -216,7 +251,7 @@ export async function uploadPlano(
   formData.append('version', String(version));
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-  const res = await fetch(`${API_URL}/ingenieria/${proyectoId}/planos`, {
+  const res = await fetch(resolveApiUrl(`/api/ingenieria/${proyectoId}/planos`), {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,

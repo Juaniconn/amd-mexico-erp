@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // API_URL vacío — las rutas en código ya incluyen /api/
+  // Same-origin via nginx: paths in code already include `/api/...`.
+  // Force empty so CI/Deploy cannot bake NEXT_PUBLIC_API_URL=/api → /api/api/...
   env: {
     NEXT_PUBLIC_API_URL: '',
   },
-  // Reescribir /api/* al backend NestJS
+  // Dev-only: proxy /api to Nest when not behind nginx
   async rewrites() {
     return {
       beforeFiles: [

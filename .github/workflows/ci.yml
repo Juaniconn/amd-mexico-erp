@@ -56,7 +56,8 @@ jobs:
       - name: Build
         run: pnpm build
         env:
-          NEXT_PUBLIC_API_URL: /api
+          # Empty = same-origin. Never `/api` (paths already include `/api/...`).
+          NEXT_PUBLIC_API_URL: ""
 
       - name: Test
         run: pnpm test

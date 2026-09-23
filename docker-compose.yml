@@ -39,7 +39,9 @@ services:
     container_name: amd-erp-web
     network_mode: host
     environment:
-      - NEXT_PUBLIC_API_URL=https://objects-bugs-epson-landscape.trycloudflare.com
+      # Browser same-origin via nginx/cloudflare — leave empty (baked at build).
+      # Do not set /api here; client paths already start with /api/.
+      - NEXT_PUBLIC_API_URL=
       - NODE_ENV=production
       - PORT=3000
     volumes:

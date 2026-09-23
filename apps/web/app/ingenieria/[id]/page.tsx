@@ -35,8 +35,7 @@ import {
 } from 'lucide-react';
 import { IngenieriaProyecto, EnumIngenieriaEstatus } from '@/types';
 import { UploadPlanoModal } from '../components/UploadPlanoModal';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+import { resolveApiUrl } from '@/lib/api';
 
 function getBadgeVariant(status: EnumIngenieriaEstatus): string {
   const variants: Record<EnumIngenieriaEstatus, string> = {
@@ -78,7 +77,7 @@ export default function IngenieriaDetallePage() {
   const fetchProyecto = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(`${API_URL}/ingenieria/${id}`, {
+      const res = await fetch(resolveApiUrl(`/api/ingenieria/${id}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -104,7 +103,7 @@ export default function IngenieriaDetallePage() {
     setActionLoading(action);
     try {
       const token = localStorage.getItem('accessToken');
-      let url = `${API_URL}/ingenieria/${id}`;
+      let url = resolveApiUrl(`/api/ingenieria/${id}`);
       
       if (action === 'iniciar_diseno') {
         url += '';
