@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/Card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { get } from '@/lib/api';
+import { get, post } from '@/lib/api';
 import {
   Loader2,
   AlertCircle,
@@ -146,6 +146,11 @@ export default function AgentesCursorPage() {
   const [selectedCloudId, setSelectedCloudId] = useState<string | null>(null);
   const [cloudRuns, setCloudRuns] = useState<CloudRun[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
+  const [launchPrompt, setLaunchPrompt] = useState('');
+  const [launchName, setLaunchName] = useState('');
+  const [autoCreatePR, setAutoCreatePR] = useState(true);
+  const [launching, setLaunching] = useState(false);
+  const [launchMsg, setLaunchMsg] = useState('');
   const limit = 12;
 
   const loadAgents = useCallback(async (p: number, cat: string, query: string) => {
@@ -232,6 +237,48 @@ export default function AgentesCursorPage() {
       setRunsLoading(false);
     }
   }, []);
+
+  const launchCloudAgent = useCallback(async () => {
+    const prompt = launchPrompt.trim();
+    if (!prompt) {
+      setLaunchMsg('Escribe un prompt (una sola tarea).');
+      return;
+    }
+    try {
+      setLaunching(true);
+      setLaunchMsg('');
+      const res = await post<{ agent?: any; run?: any }>(
+        `/api/agentes-cursor/cloud/agents`,
+        {
+          prompt,
+          name: launchName.trim() || undefined,
+          autoCreatePR,
+        },
+      );
+      const agentId = res.agent?.id;
+      setLaunchMsg(
+        agentId
+          ? `Agente creado: ${agentId}${res.agent?.url ? ` · ${res.agent.url}` : ''}`
+          : 'Agente creado',
+      );
+      setLaunchPrompt('');
+      setLaunchName('');
+      await loadCloudAgents();
+      await loadDashboard();
+      if (agentId) await loadCloudRuns(agentId);
+    } catch (err: any) {
+      setLaunchMsg(err?.message || 'No se pudo crear el agente');
+    } finally {
+      setLaunching(false);
+    }
+  }, [
+    launchPrompt,
+    launchName,
+    autoCreatePR,
+    loadCloudAgents,
+    loadDashboard,
+    loadCloudRuns,
+  ]);
 
   useEffect(() => {
     loadAgents(page, categoria, q);
@@ -339,6 +386,58 @@ export default function AgentesCursorPage() {
               <span>{cloudError}</span>
             </div>
           )}
+
+          {/* Nuevo agente / run */}
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Nuevo Cloud Agent
+              </p>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                Juaniconn/amd-mexico-erp · main
+              </span>
+            </div>
+            <input
+              value={launchName}
+              onChange={(e) => setLaunchName(e.target.value)}
+              placeholder="Nombre opcional (ej. Fix tests inventario)"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-sky-500/50"
+            />
+            <textarea
+              value={launchPrompt}
+              onChange={(e) => setLaunchPrompt(e.target.value)}
+              placeholder="Prompt: una sola tarea concreta (ver docs/CLOUD_AGENTS_PLAYBOOK.md)…"
+              rows={4}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-sky-500/50"
+            />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={autoCreatePR}
+                  onChange={(e) => setAutoCreatePR(e.target.checked)}
+                  className="rounded border-border"
+                />
+                Crear PR al terminar
+              </label>
+              <Button
+                size="sm"
+                className="gap-2"
+                disabled={launching || !launchPrompt.trim()}
+                onClick={launchCloudAgent}
+              >
+                {launching ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CloudCog className="h-3.5 w-3.5" />
+                )}
+                Lanzar agente
+              </Button>
+            </div>
+            {launchMsg && (
+              <p className="text-xs text-muted-foreground break-all">{launchMsg}</p>
+            )}
+          </div>
 
           {cloudLoading && cloudAgents.length === 0 ? (
             <div className="h-24 animate-pulse rounded-xl border border-border bg-card" />

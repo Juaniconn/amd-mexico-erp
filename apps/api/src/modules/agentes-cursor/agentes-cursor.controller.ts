@@ -1,4 +1,16 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CURSOR_AGENTS, CursorAgentInfo } from './cursor-agents.catalog';
 import { CursorCloudService } from './cursor-cloud.service';
 
@@ -43,6 +55,22 @@ export class AgentesCursorController {
     );
   }
 
+  @Post('agentes-cursor/cloud/agents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  createCloudAgent(
+    @Body()
+    body: {
+      prompt: string;
+      name?: string;
+      modelId?: string;
+      autoCreatePR?: boolean;
+      startingRef?: string;
+    },
+  ) {
+    return this.cloud.createAgent(body);
+  }
+
   @Get('agentes-cursor/cloud/agents/:id')
   cloudAgent(@Param('id') id: string) {
     return this.cloud.getAgent(id);
@@ -57,9 +85,26 @@ export class AgentesCursorController {
     return this.cloud.listRuns(id, limit ? parseInt(limit, 10) : 20, cursor);
   }
 
+  @Post('agentes-cursor/cloud/agents/:id/runs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  createCloudRun(
+    @Param('id') id: string,
+    @Body() body: { prompt: string; modelId?: string },
+  ) {
+    return this.cloud.createRun(id, body);
+  }
+
   @Get('agentes-cursor/cloud/agents/:id/runs/:runId')
   cloudAgentRun(@Param('id') id: string, @Param('runId') runId: string) {
     return this.cloud.getRun(id, runId);
+  }
+
+  @Post('agentes-cursor/cloud/agents/:id/runs/:runId/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  cancelCloudRun(@Param('id') id: string, @Param('runId') runId: string) {
+    return this.cloud.cancelRun(id, runId);
   }
 
   @Get('agentes-cursor/cloud/agents/:id/usage')
@@ -73,6 +118,11 @@ export class AgentesCursorController {
   @Get('agentes-cursor/cloud/models')
   cloudModels() {
     return this.cloud.listModels();
+  }
+
+  @Get('agentes-cursor/cloud/repositories')
+  cloudRepositories() {
+    return this.cloud.listRepositories();
   }
 
   // ─── Roster Agency (local catalog) ───────────────────────────────
@@ -102,8 +152,12 @@ export class AgentesCursorController {
     }
     const total = list.length;
     const skip = (pageNum - 1) * limitNum;
-    const data = list.slice(skip, skip + limitNum).map((a) => this.withLiveFields(a));
-    const categorias = [...new Set(CURSOR_AGENTS.map((a) => a.categoria))].sort();
+    const data = list
+      .slice(skip, skip + limitNum)
+      .map((a) => this.withLiveFields(a));
+    const categorias = [
+      ...new Set(CURSOR_AGENTS.map((a) => a.categoria)),
+    ].sort();
     return {
       data,
       meta: {
@@ -129,7 +183,9 @@ export class AgentesCursorController {
   @Get('agentes-cursor/status')
   getStatus() {
     const now = new Date();
-    const uptimeSec = Math.floor((now.getTime() - SESSION_START.getTime()) / 1000);
+    const uptimeSec = Math.floor(
+      (now.getTime() - SESSION_START.getTime()) / 1000,
+    );
     const focus = CURSOR_AGENTS.filter((a) => (a.sessionsActive || 0) > 0);
     const status = focus.map((a) => ({
       id: a.id,
@@ -187,6 +243,8 @@ export class AgentesCursorController {
           'Orquesta el roster de Agency Agents en Cursor; elige y ejecuta el especialista adecuado.',
       },
       cloud,
+      playbook: 'docs/CLOUD_AGENTS_PLAYBOOK.md',
+      defaultRepo: 'https://github.com/Juaniconn/amd-mexico-erp',
     };
   }
 }

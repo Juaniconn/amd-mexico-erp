@@ -3,6 +3,7 @@ import {
   Logger,
   ServiceUnavailableException,
   BadGatewayException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -15,16 +16,27 @@ export class CursorCloudService {
   constructor(private readonly config: ConfigService) {}
 
   private getApiKey(): string {
-    const key =
-      this.config.get<string>('CURSOR_API_KEY') ||
-      process.env.CURSOR_API_KEY ||
-      '';
-    if (!key.trim()) {
-      throw new ServiceUnavailableException(
-        'CURSOR_API_KEY no configurada. Agrega la key en apps/api/.env',
-      );
+    const candidates = [
+      this.config.get<string>('CURSOR_API_KEY'),
+      process.env.CURSOR_API_KEY,
+    ];
+    for (const c of candidates) {
+      if (c && c.trim()) return c.trim();
     }
-    return key.trim();
+    // Docker compose may set CURSOR_API_KEY="" and override ConfigModule .env
+    try {
+      const fs = require('fs') as typeof import('fs');
+      for (const p of ['.env', 'apps/api/.env', '/app/.env']) {
+        if (!fs.existsSync(p)) continue;
+        const m = fs.readFileSync(p, 'utf8').match(/^CURSOR_API_KEY=(.+)$/m);
+        if (m?.[1]?.trim()) return m[1].trim().replace(/^["']|["']$/g, '');
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new ServiceUnavailableException(
+      'CURSOR_API_KEY no configurada. Agrega la key en apps/api/.env',
+    );
   }
 
   private async request<T>(
@@ -124,6 +136,75 @@ export class CursorCloudService {
 
   async listModels() {
     return this.request<{ items?: any[]; models?: string[] }>('/v1/models');
+  }
+
+  async listRepositories() {
+    return this.request<{ items?: Array<{ url: string }> }>('/v1/repositories');
+  }
+
+  /**
+   * Crea un Cloud Agent + primer run sobre amd-mexico-erp.
+   * El repo se fija en backend (no confiar en el cliente).
+   */
+  async createAgent(input: {
+    prompt: string;
+    name?: string;
+    modelId?: string;
+    autoCreatePR?: boolean;
+    startingRef?: string;
+  }) {
+    const text = (input.prompt || '').trim();
+    if (!text) {
+      throw new BadRequestException('prompt requerido');
+    }
+    const body: Record<string, any> = {
+      prompt: { text },
+      name: (input.name || '').trim().slice(0, 100) || undefined,
+      repos: [
+        {
+          url: 'https://github.com/Juaniconn/amd-mexico-erp',
+          startingRef: input.startingRef || 'main',
+        },
+      ],
+      autoCreatePR: input.autoCreatePR !== false,
+    };
+    if (input.modelId?.trim()) {
+      body.model = { id: input.modelId.trim() };
+    }
+    return this.request<{ agent: any; run: any }>('/v1/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async createRun(
+    agentId: string,
+    input: { prompt: string; modelId?: string },
+  ) {
+    const text = (input.prompt || '').trim();
+    if (!text) {
+      throw new BadRequestException('prompt requerido');
+    }
+    const body: Record<string, any> = { prompt: { text } };
+    if (input.modelId?.trim()) {
+      body.model = { id: input.modelId.trim() };
+    }
+    return this.request<any>(
+      `/v1/agents/${encodeURIComponent(agentId)}/runs`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+  }
+
+  async cancelRun(agentId: string, runId: string) {
+    return this.request<{ id: string }>(
+      `/v1/agents/${encodeURIComponent(agentId)}/runs/${encodeURIComponent(runId)}/cancel`,
+      { method: 'POST' },
+    );
   }
 
   /** Resumen para el dashboard del módulo */
