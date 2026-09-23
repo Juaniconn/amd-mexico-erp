@@ -1,6 +1,5 @@
 name: Deploy AMD ERP
 
-# Solo despliega cuando CI en main terminó OK.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -23,42 +22,38 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Test SSH connection
-        run: |
-          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o ForwardAgent=no \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "echo SSH_OK; hostname; whoami; cd /home/ubuntu/data/projets/amd_web_app && git rev-parse --short HEAD"
-
       - name: Deploy to server (hot-deploy)
         run: |
           ssh -o StrictHostKeyChecking=no -o ForwardAgent=no \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'ENDSSH'
-          set -e
-          export PATH="$HOME/.local/bin:$PATH"
-          # Evitar que el agent de GitHub Actions se use para git fetch → GitHub
-          unset SSH_AUTH_SOCK
-          unset SSH_AGENT_PID
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            'bash -lc "bash -s"' << 'ENDSSH'
+          set -eux
+          LOG=/tmp/amd-erp-deploy.log
+          exec > >(tee -a "$LOG") 2>&1
+          echo "===== $(date -Is) deploy start ====="
+          export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+          unset SSH_AUTH_SOCK || true
+          unset SSH_AGENT_PID || true
+          echo "USER=$(whoami) HOME=$HOME PWD=$(pwd)"
+          echo "which git=$(which git) pnpm=$(which pnpm || echo MISSING) docker=$(which docker || echo MISSING)"
 
           cd /home/ubuntu/data/projets/amd_web_app
-
-          echo "== git =="
           git status -sb
           if [ -n "$(git status --porcelain)" ]; then
-            echo "ABORT: working tree sucio"
+            echo "ABORT dirty tree"
             git status --porcelain | head -40
             exit 1
           fi
+
           git fetch origin main
           git merge --ff-only origin/main
           echo "HEAD=$(git rev-parse --short HEAD)"
 
-          echo "== install & build =="
           pnpm install --frozen-lockfile
           pnpm --filter api exec prisma generate
           pnpm --filter api build
           NEXT_PUBLIC_API_URL=/api pnpm --filter web build
 
-          echo "== hot-deploy into running containers =="
           docker cp apps/api/dist/. amd-erp-api:/app/apps/api/dist/
           if [ -f apps/api/.env ]; then
             docker cp apps/api/.env amd-erp-api:/app/.env
@@ -66,14 +61,17 @@ jobs:
           docker cp apps/web/.next/. amd-erp-web:/app/.next/
           docker restart amd-erp-api amd-erp-web
 
-          echo "== migrate =="
-          npx prisma migrate deploy --schema apps/api/prisma/schema.prisma || \
-            echo "WARN: migrate skip/fail"
+          npx prisma migrate deploy --schema apps/api/prisma/schema.prisma || echo "WARN migrate"
 
-          echo "== smoke =="
           sleep 5
           curl -sf -o /dev/null http://127.0.0.1:3001/api/docs && echo API_OK
           curl -sf -o /dev/null http://127.0.0.1:3000/ && echo WEB_OK
-          docker ps --filter name=amd-erp --format 'table {{.Names}}\t{{.Status}}'
-          echo "Deploy OK"
+          echo "===== deploy OK ====="
           ENDSSH
+
+      - name: Fetch remote deploy log
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ForwardAgent=no \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "tail -n 80 /tmp/amd-erp-deploy.log || echo NO_LOG"
