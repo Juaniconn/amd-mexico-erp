@@ -682,6 +682,12 @@ export default function CotizacionDetallePage() {
                                   {d.piezaDescripcion}
                                 </p>
                               )}
+                              {(d as any).archivoPlanoId && (
+                                <p className="text-xs text-brand mt-0.5 flex items-center gap-1">
+                                  <FileText className="w-3 h-3" />
+                                  Plano ligado
+                                </p>
+                              )}
                               {d.procesoRequerido && (
                                 <div className="flex items-center gap-1 mt-1">
                                   <Wrench className="w-3 h-3 text-muted-foreground" />

@@ -170,6 +170,25 @@ export function patch<T = any>(path: string, body?: any): Promise<T> {
   });
 }
 
+/** Multipart POST (no JSON Content-Type; browser sets boundary). */
+export async function postForm<T = any>(
+  path: string,
+  form: FormData,
+): Promise<T> {
+  const url = resolveApiUrl(path);
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(url, { method: 'POST', headers, body: form });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data);
+  }
+  return res.json();
+}
+
 // ─── Ingeniería API Helpers ──────────────────────────────
 
 export interface IngenieriaProyecto {

@@ -49,6 +49,10 @@ export class DetalleCotizacionDto {
   @IsString()
   @IsOptional()
   notas?: string;
+
+  @IsString()
+  @IsOptional()
+  archivoPlanoId?: string;
 }
 
 export class CreateCotizacionDto {
@@ -79,6 +83,10 @@ export class CreateCotizacionDto {
   @IsString()
   @IsOptional()
   notas?: string;
+
+  @IsString()
+  @IsOptional()
+  archivoPlanoId?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

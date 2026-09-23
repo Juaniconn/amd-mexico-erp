@@ -52,6 +52,9 @@ export class CotizacionesService {
           total: new Prisma.Decimal(total),
           estatus: 'BORRADOR' as any,
           notas: data.notas,
+          ...(data.archivoPlanoId
+            ? { archivoPlanoId: data.archivoPlanoId }
+            : {}),
           detalles: {
             create: data.detalles.map((d) => ({
               numeroParte: d.numeroParte,
@@ -66,6 +69,9 @@ export class CotizacionesService {
                 : null,
               procesoRequerido: d.procesoRequerido,
               notas: d.notas,
+              ...((d as any).archivoPlanoId
+                ? { archivoPlanoId: (d as any).archivoPlanoId }
+                : {}),
             })),
           },
         },

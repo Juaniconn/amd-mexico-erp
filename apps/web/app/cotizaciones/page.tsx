@@ -23,6 +23,7 @@ import {
   X,
   Calendar,
   Loader2,
+  Upload,
 } from 'lucide-react';
 import { get, put, del, post } from '@/lib/api';
 import type { Cotizacion, CotizacionWithParts, DetalleCotizacion } from '@/types';
@@ -403,10 +404,21 @@ function CotizacionesContent() {
             Gestión de RFQ y cotizaciones de manufactura
           </p>
         </div>
-        <Button size="sm" className="gap-2" onClick={openNewCotizacion}>
-          <Plus className="h-4 w-4" />
-          Nueva Cotización
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            onClick={() => router.push('/cotizaciones/desde-paquete')}
+          >
+            <Upload className="h-4 w-4" />
+            Desde paquete
+          </Button>
+          <Button size="sm" className="gap-2" onClick={openNewCotizacion}>
+            <Plus className="h-4 w-4" />
+            Nueva Cotización
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards with borders */}

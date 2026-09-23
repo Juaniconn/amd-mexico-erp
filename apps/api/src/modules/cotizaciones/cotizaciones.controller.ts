@@ -8,8 +8,13 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CotizacionesService } from './cotizaciones.service';
+import { CotizacionPaqueteService } from './cotizacion-paquete.service';
 import { CreateCotizacionDto, UpdateCotizacionDto } from './dto/create-cotizacion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -28,6 +33,7 @@ import {
 export class CotizacionesController {
   constructor(
     private readonly cotizacionesService: CotizacionesService,
+    private readonly paqueteService: CotizacionPaqueteService,
     private readonly produccionService: ProduccionService,
   ) {}
 
@@ -41,6 +47,62 @@ export class CotizacionesController {
     return this.cotizacionesService.create({
       ...createCotizacionDto,
       sucursalId: sid,
+    });
+  }
+
+  @Post('desde-paquete')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'zip', maxCount: 1 },
+        { name: 'bomFile', maxCount: 1 },
+      ],
+      { limits: { fileSize: 100 * 1024 * 1024 } },
+    ),
+  )
+  async createDesdePaquete(
+    @UploadedFiles()
+    files: {
+      zip?: Express.Multer.File[];
+      bomFile?: Express.Multer.File[];
+    },
+    @Body()
+    body: {
+      clienteId?: string;
+      sucursalId?: string;
+      moneda?: string;
+      notas?: string;
+      bom?: string;
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    const zip = files?.zip?.[0];
+    if (!zip?.buffer?.length) {
+      throw new BadRequestException('Falta el archivo ZIP (campo zip)');
+    }
+    const bomText =
+      body.bom?.trim() ||
+      (files?.bomFile?.[0]?.buffer
+        ? files.bomFile[0].buffer.toString('utf8')
+        : '');
+    if (!bomText) {
+      throw new BadRequestException(
+        'Falta el BOM (campo bom texto o archivo bomFile)',
+      );
+    }
+    if (!body.clienteId) {
+      throw new BadRequestException('Falta clienteId');
+    }
+    const sid = requireSucursalId(user, body.sucursalId);
+    return this.paqueteService.createFromPaquete({
+      zipBuffer: zip.buffer,
+      zipName: zip.originalname || 'paquete.zip',
+      bomText,
+      clienteId: body.clienteId,
+      sucursalId: sid,
+      moneda: body.moneda,
+      notas: body.notas,
     });
   }
 
@@ -82,17 +144,21 @@ export class CotizacionesController {
 
   @Post(':id/aprobar')
   @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
-  async aprobarYConvertir(@Param('id') id: string, @Body() body: { responsableId?: string }) {
-    // 1. Cambiar estatus a ACEPTADA
+  async aprobarYConvertir(
+    @Param('id') id: string,
+    @Body() body: { responsableId?: string },
+  ) {
     await this.cotizacionesService.update(id, { estatus: 'ACEPTADA' } as any);
-    // 2. Convertir a OT
     const ot = await this.produccionService.convertirCotizacionAOrdenTrabajo({
       cotizacionId: id,
       responsableId: body.responsableId,
     });
-    // 3. Actualizar estatus a CONVERTIDA
     await this.cotizacionesService.update(id, { estatus: 'CONVERTIDA' } as any);
-    return { id: ot.id, folio: ot.folio, message: 'Cotización aprobada y convertida a OT' };
+    return {
+      id: ot.id,
+      folio: ot.folio,
+      message: 'Cotización aprobada y convertida a OT',
+    };
   }
 
   @Get('cotizacion/:id/ot')
