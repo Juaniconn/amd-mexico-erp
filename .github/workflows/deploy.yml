@@ -1,6 +1,6 @@
 name: Deploy AMD ERP
 
-# Solo despliega cuando CI en main terminó OK (no en paralelo ni si lint falla).
+# Solo despliega cuando CI en main terminó OK.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
 
     steps:
@@ -27,9 +27,9 @@ jobs:
         run: |
           ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "echo SSH_OK; hostname; whoami; cd /home/ubuntu/data/projets/amd_web_app && git rev-parse --short HEAD && git status -sb"
+            "echo SSH_OK; hostname; whoami; cd /home/ubuntu/data/projets/amd_web_app && git rev-parse --short HEAD"
 
-      - name: Deploy to server
+      - name: Deploy to server (hot-deploy)
         run: |
           ssh -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'ENDSSH'
@@ -37,49 +37,39 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           cd /home/ubuntu/data/projets/amd_web_app
 
-          echo "== git status =="
+          echo "== git =="
           git status -sb
           if [ -n "$(git status --porcelain)" ]; then
-            echo "ABORT: working tree sucio en el servidor"
+            echo "ABORT: working tree sucio"
             git status --porcelain | head -40
             exit 1
           fi
-
-          echo "== pull origin/main =="
           git fetch origin main
           git merge --ff-only origin/main
           echo "HEAD=$(git rev-parse --short HEAD)"
 
-          echo "== rebuild api + web =="
-          # Imágenes con los mismos nombres que ya corren en el host
-          docker build -t amd-erp-api:latest -f apps/api/Dockerfile .
-          docker build -t amd-erp-web:latest -f apps/web/Dockerfile .
+          echo "== install & build =="
+          pnpm install --frozen-lockfile
+          pnpm --filter api exec prisma generate
+          pnpm --filter api build
+          NEXT_PUBLIC_API_URL=/api pnpm --filter web build
 
-          echo "== recreate api/web containers =="
-          # Preservar db/redis/minio; solo recrear app
-          docker stop amd-erp-api amd-erp-web 2>/dev/null || true
-          docker rm amd-erp-api amd-erp-web 2>/dev/null || true
+          echo "== hot-deploy into running containers =="
+          docker cp apps/api/dist/. amd-erp-api:/app/apps/api/dist/
+          if [ -f apps/api/.env ]; then
+            docker cp apps/api/.env amd-erp-api:/app/.env
+          fi
+          docker cp apps/web/.next/. amd-erp-web:/app/.next/
+          docker restart amd-erp-api amd-erp-web
 
-          # Arrancar vía compose (network_mode host en api)
-          cd infra/docker
-          sg docker -c "docker compose -p amd-erp up -d --no-deps --force-recreate api web" \
-            || sg docker -c "docker compose up -d --no-deps --force-recreate api web"
-
-          echo "== wait api =="
-          for i in $(seq 1 40); do
-            if curl -sf -o /dev/null http://127.0.0.1:3001/api/docs; then
-              echo "API OK"
-              break
-            fi
-            sleep 3
-          done
-
-          echo "== prisma migrate (host) =="
-          cd /home/ubuntu/data/projets/amd_web_app
-          npx prisma generate --schema apps/api/prisma/schema.prisma || true
+          echo "== migrate =="
           npx prisma migrate deploy --schema apps/api/prisma/schema.prisma || \
-            echo "WARN: migrate falló o no hay migraciones pendientes"
+            echo "WARN: migrate skip/fail"
 
-          docker ps --filter name=amd-erp --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+          echo "== smoke =="
+          sleep 5
+          curl -sf -o /dev/null http://127.0.0.1:3001/api/docs && echo API_OK
+          curl -sf -o /dev/null http://127.0.0.1:3000/ && echo WEB_OK
+          docker ps --filter name=amd-erp --format 'table {{.Names}}\t{{.Status}}'
           echo "Deploy OK"
           ENDSSH
