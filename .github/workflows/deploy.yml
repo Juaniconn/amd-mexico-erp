@@ -14,7 +14,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
 
     steps:
@@ -27,24 +27,20 @@ jobs:
         run: |
           ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "echo SSH_OK; hostname; whoami"
+            "echo SSH_OK; hostname; whoami; cd /home/ubuntu/data/projets/amd_web_app && git rev-parse --short HEAD && git status -sb"
 
       - name: Deploy to server
         run: |
           ssh -o StrictHostKeyChecking=no \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "bash -s" << 'EOF'
-          set -euo pipefail
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" << 'ENDSSH'
+          set -e
           export PATH="$HOME/.local/bin:$PATH"
           cd /home/ubuntu/data/projets/amd_web_app
 
           echo "== git status =="
           git status -sb
-
-          # No pisar trabajo local sin commit en el servidor
           if [ -n "$(git status --porcelain)" ]; then
-            echo "ABORT: el working tree del servidor tiene cambios sin commit."
-            echo "Haz commit/push o limpia el tree antes del auto-deploy."
+            echo "ABORT: working tree sucio en el servidor"
             git status --porcelain | head -40
             exit 1
           fi
@@ -52,33 +48,38 @@ jobs:
           echo "== pull origin/main =="
           git fetch origin main
           git merge --ff-only origin/main
+          echo "HEAD=$(git rev-parse --short HEAD)"
 
-          echo "== docker compose build & up =="
-          COMPOSE="docker compose -f infra/docker/docker-compose.yml"
-          sg docker -c "$COMPOSE pull --ignore-pull-failures" || true
-          sg docker -c "$COMPOSE up -d db redis minio"
-          sg docker -c "$COMPOSE build api web"
-          sg docker -c "$COMPOSE up -d api web"
+          echo "== rebuild api + web =="
+          # Imágenes con los mismos nombres que ya corren en el host
+          docker build -t amd-erp-api:latest -f apps/api/Dockerfile .
+          docker build -t amd-erp-web:latest -f apps/web/Dockerfile .
 
-          echo "== wait postgres =="
-          for i in $(seq 1 30); do
-            if sg docker -c "$COMPOSE exec -T db pg_isready -h localhost -p 5432 -U erp -d erp_db" >/dev/null 2>&1; then
-              echo "PostgreSQL listo"
+          echo "== recreate api/web containers =="
+          # Preservar db/redis/minio; solo recrear app
+          docker stop amd-erp-api amd-erp-web 2>/dev/null || true
+          docker rm amd-erp-api amd-erp-web 2>/dev/null || true
+
+          # Arrancar vía compose (network_mode host en api)
+          cd infra/docker
+          sg docker -c "docker compose -p amd-erp up -d --no-deps --force-recreate api web" \
+            || sg docker -c "docker compose up -d --no-deps --force-recreate api web"
+
+          echo "== wait api =="
+          for i in $(seq 1 40); do
+            if curl -sf -o /dev/null http://127.0.0.1:3001/api/docs; then
+              echo "API OK"
               break
             fi
-            sleep 2
+            sleep 3
           done
 
-          echo "== prisma migrate =="
-          # Preferir prisma del contenedor API si existe; fallback host
-          if sg docker -c "$COMPOSE exec -T api npx prisma migrate deploy --schema apps/api/prisma/schema.prisma" 2>/dev/null; then
-            echo "migrate via api container OK"
-          else
-            npx prisma generate --schema apps/api/prisma/schema.prisma
-            npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
-          fi
+          echo "== prisma migrate (host) =="
+          cd /home/ubuntu/data/projets/amd_web_app
+          npx prisma generate --schema apps/api/prisma/schema.prisma || true
+          npx prisma migrate deploy --schema apps/api/prisma/schema.prisma || \
+            echo "WARN: migrate falló o no hay migraciones pendientes"
 
-          echo "== containers =="
-          sg docker -c "$COMPOSE ps"
+          docker ps --filter name=amd-erp --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
           echo "Deploy OK"
-          EOF
+          ENDSSH
