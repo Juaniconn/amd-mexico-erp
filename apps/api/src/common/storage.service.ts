@@ -3,7 +3,7 @@ import { randomUUID, createHash, createHmac } from 'crypto';
 import * as http from 'http';
 
 /**
- * Lightweight S3/MinIO PUT using Signature V4 — no minio npm dependency.
+ * Lightweight S3/MinIO PUT/GET using Signature V4 — no minio npm dependency.
  */
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -54,17 +54,20 @@ export class StorageService implements OnModuleInit {
   }
 
   private async ensureBucket() {
-    // HEAD bucket; if 404, PUT bucket
     const head = await this.s3Request('HEAD', `/${this.bucket}`);
     if (head.statusCode === 200) return;
     if (head.statusCode === 404) {
       const put = await this.s3Request('PUT', `/${this.bucket}`);
       if (put.statusCode !== 200 && put.statusCode !== 409) {
-        throw new Error(`makeBucket HTTP ${put.statusCode}: ${put.body}`);
+        throw new Error(
+          `makeBucket HTTP ${put.statusCode}: ${put.body.toString('utf8')}`,
+        );
       }
       return;
     }
-    throw new Error(`HEAD bucket HTTP ${head.statusCode}: ${head.body}`);
+    throw new Error(
+      `HEAD bucket HTTP ${head.statusCode}: ${head.body.toString('utf8')}`,
+    );
   }
 
   async upload(
@@ -78,9 +81,16 @@ export class StorageService implements OnModuleInit {
 
     if (this.enabled) {
       const path = `/${this.bucket}/${objectName}`;
-      const res = await this.s3Request('PUT', path, buffer, contentType || 'application/octet-stream');
+      const res = await this.s3Request(
+        'PUT',
+        path,
+        buffer,
+        contentType || 'application/octet-stream',
+      );
       if (res.statusCode !== 200) {
-        throw new Error(`Upload MinIO HTTP ${res.statusCode}: ${res.body}`);
+        throw new Error(
+          `Upload MinIO HTTP ${res.statusCode}: ${res.body.toString('utf8')}`,
+        );
       }
       return `s3://${this.bucket}/${objectName}`;
     }
@@ -88,8 +98,27 @@ export class StorageService implements OnModuleInit {
     return `/uploads/${objectName}`;
   }
 
-  async getPresignedUrl(_archivoUrl: string, _expirySec = 3600): Promise<string | null> {
-    return null; // optional later
+  /** Download object by s3://bucket/key */
+  async download(archivoUrl: string): Promise<Buffer | null> {
+    if (!archivoUrl?.startsWith('s3://') || !this.enabled) return null;
+    const without = archivoUrl.slice('s3://'.length);
+    const slash = without.indexOf('/');
+    if (slash < 0) return null;
+    const bucket = without.slice(0, slash);
+    const key = without.slice(slash + 1);
+    const res = await this.s3Request('GET', `/${bucket}/${key}`);
+    if (res.statusCode !== 200) {
+      this.logger.warn(`download ${archivoUrl} → HTTP ${res.statusCode}`);
+      return null;
+    }
+    return res.body;
+  }
+
+  async getPresignedUrl(
+    _archivoUrl: string,
+    _expirySec = 3600,
+  ): Promise<string | null> {
+    return null;
   }
 
   private async s3Request(
@@ -97,7 +126,7 @@ export class StorageService implements OnModuleInit {
     canonicalUri: string,
     body?: Buffer,
     contentType?: string,
-  ): Promise<{ statusCode: number; body: string }> {
+  ): Promise<{ statusCode: number; body: Buffer }> {
     const now = new Date();
     const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
     const dateStamp = amzDate.slice(0, 8);
@@ -169,7 +198,7 @@ export class StorageService implements OnModuleInit {
           res.on('end', () => {
             resolve({
               statusCode: res.statusCode || 0,
-              body: Buffer.concat(chunks).toString('utf8'),
+              body: Buffer.concat(chunks),
             });
           });
         },

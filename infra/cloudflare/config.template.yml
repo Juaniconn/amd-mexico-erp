@@ -1,0 +1,10 @@
+# Named Cloudflare Tunnel → local nginx :80
+# Copy to ~/.cloudflared/config.yml and fill TUNNEL_ID + hostname.
+
+tunnel: REPLACE_TUNNEL_ID
+credentials-file: /home/ubuntu/.cloudflared/REPLACE_TUNNEL_ID.json
+
+ingress:
+  - hostname: app.amd-mexico.com
+    service: http://127.0.0.1:80
+  - service: http_status:404
