@@ -62,6 +62,8 @@ jobs:
           if [ -f apps/api/.env ]; then
             docker cp apps/api/.env amd-erp-api:/app/.env
           fi
+          # Wipe before copy so stale hashed chunks cannot serve old /api/api clients
+          docker exec amd-erp-web sh -c 'rm -rf /app/.next && mkdir -p /app/.next'
           docker cp apps/web/.next/. amd-erp-web:/app/.next/
           docker restart amd-erp-api amd-erp-web
 

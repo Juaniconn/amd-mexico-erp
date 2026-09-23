@@ -31,8 +31,10 @@ export function resolveApiUrl(
     p = p.slice(4) || '/';
   }
 
-  if (!rawBase) return p;
-  return `${rawBase}${p}`;
+  let joined = rawBase ? `${rawBase}${p}` : p;
+  // Last-resort collapse: /api/api/foo → /api/foo (absolute or relative)
+  joined = joined.replace(/(\/api)(?:\/api)+/g, '/api');
+  return joined;
 }
 
 export interface OrdenTrabajo {

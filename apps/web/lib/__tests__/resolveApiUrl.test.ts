@@ -37,9 +37,11 @@ describe('resolveApiUrl', () => {
     );
   });
 
-  it('passes through absolute URLs', () => {
-    expect(resolveApiUrl('https://other.test/api/x', '/api')).toBe(
-      'https://other.test/api/x',
-    );
+  it('collapses accidental /api/api in joined URL', () => {
+    expect(resolveApiUrl('/api/api/cotizaciones', '')).toBe('/api/cotizaciones');
+    expect(resolveApiUrl('/api/cotizaciones', '/api')).toBe('/api/cotizaciones');
+    expect(
+      resolveApiUrl('/api/api/cotizaciones', 'https://x.example/api'),
+    ).toBe('https://x.example/api/cotizaciones');
   });
 });

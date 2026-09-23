@@ -220,7 +220,9 @@ HOST_SYSINFO_URL=http://127.0.0.1:3002
 
 ### Web
 ```
-NEXT_PUBLIC_API_URL=https://objects-bugs-epson-landscape.trycloudflare.com
+# Empty = same-origin (nginx :80 proxies /api → Nest). Paths in code already use /api/...
+# NEVER set to "/api" — that produces /api/api/... 404s (fixed 2026-09-23 via resolveApiUrl + nginx strip).
+NEXT_PUBLIC_API_URL=
 NODE_ENV=production
 PORT=3000
 ```
