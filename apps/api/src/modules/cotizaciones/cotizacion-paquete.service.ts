@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+  forwardRef,
+  Logger,
+} from '@nestjs/common';
 import AdmZip from 'adm-zip';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage.service';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto';
 import { CotizacionesService } from './cotizaciones.service';
 import { parseBomAuto, pdfStem, BomRow } from './bom-parser';
+import { HermesCotizacionService } from './hermes-cotizacion.service';
 
 export type DesdePaqueteInput = {
   zipBuffer: Buffer;
@@ -14,14 +22,20 @@ export type DesdePaqueteInput = {
   sucursalId?: string;
   moneda?: string;
   notas?: string;
+  /** Default true: cotiza con Hermes tras crear borrador */
+  conHermes?: boolean;
 };
 
 @Injectable()
 export class CotizacionPaqueteService {
+  private readonly logger = new Logger(CotizacionPaqueteService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly cotizaciones: CotizacionesService,
+    @Inject(forwardRef(() => HermesCotizacionService))
+    private readonly hermes: HermesCotizacionService,
   ) {}
 
   async createFromPaquete(input: DesdePaqueteInput) {
@@ -132,7 +146,7 @@ export class CotizacionPaqueteService {
       `ZIP storage: ${zipUrl}`,
     ].filter(Boolean);
 
-    const cotizacion = await this.cotizaciones.create({
+    let cotizacion = await this.cotizaciones.create({
       clienteId: input.clienteId,
       sucursalId: input.sucursalId,
       moneda: input.moneda || 'MXN',
@@ -140,6 +154,20 @@ export class CotizacionPaqueteService {
       detalles,
       archivoPlanoId: zipUrl,
     } as any);
+
+    const conHermes = input.conHermes !== false;
+    let hermesMeta: any = null;
+    if (conHermes && cotizacion?.id) {
+      try {
+        this.logger.log(`Hermes cotizando ${cotizacion.id}…`);
+        const priced = await this.hermes.cotizarConHermes(cotizacion.id);
+        hermesMeta = priced.hermes || { used: true };
+        cotizacion = priced;
+      } catch (e: any) {
+        this.logger.warn(`Hermes post-paquete: ${e?.message || e}`);
+        hermesMeta = { used: false, error: e?.message || String(e) };
+      }
+    }
 
     return {
       ...cotizacion,
@@ -150,6 +178,7 @@ export class CotizacionPaqueteService {
         missingPdf: [],
         extraPdf,
       },
+      hermes: hermesMeta,
     };
   }
 }

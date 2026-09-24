@@ -187,7 +187,7 @@ export class CotizacionEstimacionService {
         'REQUIERE REVISIÓN HUMANA',
       ].join(' | ');
 
-      const d = cot.detalles.find((x) => x.id === row.id)!;
+      const d = cot.detalles.find((x: { id: string }) => x.id === row.id)!;
       const prevNotas = (d.notas || '')
         .replace(/\s*\|?\s*Estimado IA[\s\S]*$/i, '')
         .trim();
@@ -209,7 +209,8 @@ export class CotizacionEstimacionService {
       where: { cotizacionId },
     });
     const subtotal = fresh.reduce(
-      (s, d) => s + Number(d.precioUnitario) * d.cantidad,
+      (s: number, d: { precioUnitario: unknown; cantidad: number }) =>
+        s + Number(d.precioUnitario) * d.cantidad,
       0,
     );
     const iva = subtotal * 0.16;

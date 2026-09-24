@@ -16,6 +16,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CotizacionesService } from './cotizaciones.service';
 import { CotizacionPaqueteService } from './cotizacion-paquete.service';
 import { CotizacionEstimacionService } from './cotizacion-estimacion.service';
+import { HermesCotizacionService } from './hermes-cotizacion.service';
 import { CreateCotizacionDto, UpdateCotizacionDto } from './dto/create-cotizacion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -36,6 +37,7 @@ export class CotizacionesController {
     private readonly cotizacionesService: CotizacionesService,
     private readonly paqueteService: CotizacionPaqueteService,
     private readonly estimacionService: CotizacionEstimacionService,
+    private readonly hermesCotizacion: HermesCotizacionService,
     private readonly produccionService: ProduccionService,
   ) {}
 
@@ -76,6 +78,7 @@ export class CotizacionesController {
       moneda?: string;
       notas?: string;
       bom?: string;
+      conHermes?: string | boolean;
     },
     @CurrentUser() user: AuthUser,
   ) {
@@ -97,6 +100,12 @@ export class CotizacionesController {
       throw new BadRequestException('Falta clienteId');
     }
     const sid = requireSucursalId(user, body.sucursalId);
+    const conHermes =
+      body.conHermes === undefined ||
+      body.conHermes === '' ||
+      body.conHermes === true ||
+      body.conHermes === 'true' ||
+      body.conHermes === '1';
     return this.paqueteService.createFromPaquete({
       zipBuffer: zip.buffer,
       zipName: zip.originalname || 'paquete.zip',
@@ -105,6 +114,7 @@ export class CotizacionesController {
       sucursalId: sid,
       moneda: body.moneda,
       notas: body.notas,
+      conHermes,
     });
   }
 
@@ -144,10 +154,34 @@ export class CotizacionesController {
     return this.cotizacionesService.remove(id);
   }
 
+  /** @deprecated Preferir hermes-cotizar — se mantiene como fallback heurístico */
   @Post(':id/estimar-precios')
   @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
   async estimarPrecios(@Param('id') id: string) {
     return this.estimacionService.estimarPrecios(id);
+  }
+
+  @Post(':id/hermes-cotizar')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
+  async hermesCotizar(@Param('id') id: string) {
+    return this.hermesCotizacion.cotizarConHermes(id);
+  }
+
+  @Post(':id/hermes-chat')
+  @Roles(Role.ADMIN, Role.GERENTE, Role.VENDEDOR)
+  async hermesChat(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      message?: string;
+      history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    },
+  ) {
+    const message = body?.message?.trim();
+    if (!message) {
+      throw new BadRequestException('Falta message');
+    }
+    return this.hermesCotizacion.chat(id, message, body.history || []);
   }
 
   @Post(':id/aprobar')

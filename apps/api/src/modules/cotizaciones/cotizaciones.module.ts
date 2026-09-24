@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CotizacionesService } from './cotizaciones.service';
 import { CotizacionPaqueteService } from './cotizacion-paquete.service';
 import { CotizacionEstimacionService } from './cotizacion-estimacion.service';
+import { HermesCotizacionService } from './hermes-cotizacion.service';
 import { CotizacionesController } from './cotizaciones.controller';
 import { PrismaModule } from '../../database/prisma.module';
 import { ProduccionModule } from '../produccion/produccion.module';
@@ -14,7 +15,8 @@ import { StorageModule } from '../../common/storage.module';
     CotizacionesService,
     CotizacionPaqueteService,
     CotizacionEstimacionService,
+    HermesCotizacionService,
   ],
-  exports: [CotizacionesService],
+  exports: [CotizacionesService, HermesCotizacionService],
 })
 export class CotizacionesModule {}

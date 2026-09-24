@@ -53,6 +53,7 @@ function DesdePaqueteContent() {
   const [error, setError] = useState('');
   const [loadingClientes, setLoadingClientes] = useState(true);
   const [dragOver, setDragOver] = useState(false);
+  const [conHermes, setConHermes] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -153,14 +154,19 @@ function DesdePaqueteContent() {
       form.append('bom', bom);
       form.append('clienteId', clienteId);
       form.append('moneda', moneda);
+      form.append('conHermes', conHermes ? 'true' : 'false');
       if (notas.trim()) form.append('notas', notas.trim());
 
       const result = await postForm<{
         id: string;
         folio: string;
         match?: { matched: number; extraPdf?: string[] };
+        hermes?: { used?: boolean; fallback?: boolean; lineas?: number };
       }>('/api/cotizaciones/desde-paquete', form);
 
+      if (result?.hermes?.used === false && result?.hermes?.fallback) {
+        // still redirect; user sees heuristic prices
+      }
       router.push(`/cotizaciones/${result.id}`);
     } catch (err: any) {
       const data = err instanceof ApiError ? err.data : null;
@@ -202,8 +208,8 @@ function DesdePaqueteContent() {
             Cotización desde paquete
           </h1>
           <p className="text-sm text-muted-foreground">
-            Sube el ZIP de planos PDF y pega la tabla Item / DWG / Material /
-            QTY (Outlook, CSV o TSV). Se crea un borrador con precio 0.
+            Solo sube el ZIP de planos y pega el BOM del cliente. Hermes
+            (LongCat) genera el borrador con precios para que lo revises.
           </p>
         </div>
       </div>
@@ -432,6 +438,23 @@ function DesdePaqueteContent() {
           </div>
         )}
 
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={conHermes}
+            disabled={loading}
+            onChange={(e) => setConHermes(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">Aplicar precios con Hermes</span>
+            <span className="block text-xs text-muted-foreground">
+              LongCat analiza BOM + planos (ignora QTY del PDF). Recomendado.
+              Si falla, usa estimación heurística.
+            </span>
+          </span>
+        </label>
+
         <label className="block space-y-1.5 text-sm">
           <span className="font-medium">Notas (opcional)</span>
           <input
@@ -462,7 +485,11 @@ function DesdePaqueteContent() {
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            {loading ? 'Procesando…' : 'Crear borrador'}
+            {loading
+              ? conHermes
+                ? 'Hermes cotizando…'
+                : 'Procesando…'
+              : 'Generar borrador'}
           </Button>
         </div>
       </form>

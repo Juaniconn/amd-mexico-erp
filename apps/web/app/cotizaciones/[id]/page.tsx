@@ -98,6 +98,12 @@ export default function CotizacionDetallePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatedOTId, setGeneratedOTId] = useState<string | null>(null);
+  const [hermesChatOpen, setHermesChatOpen] = useState(false);
+  const [hermesChatInput, setHermesChatInput] = useState('');
+  const [hermesChatLog, setHermesChatLog] = useState<
+    Array<{ role: 'user' | 'assistant'; content: string }>
+  >([]);
+  const [hermesChatBusy, setHermesChatBusy] = useState(false);
 
   const [editForm, setEditForm] = useState<EditForm>({
     moneda: 'MXN',
@@ -222,34 +228,68 @@ export default function CotizacionDetallePage() {
     }
   };
 
-  const handleEstimarPrecios = async () => {
+  const handleHermesCotizar = async () => {
     if (
       !confirm(
-        'El agente estimará precios (mercado CJ/MX + tarifas taller). ¿Continuar? Deberás revisar antes de enviar al cliente.',
+        'Hermes (LongCat) cotizará con BOM + planos (ignora QTY del PDF). Los precios se aplican al borrador para que los revises. ¿Continuar?',
       )
     ) {
       return;
     }
-    setActionLoading('estimar');
+    setActionLoading('hermes');
     setError('');
     try {
       const result = await post<{
-        estimacion?: { disclaimer?: string; lineas?: number };
-      }>(`/api/cotizaciones/${id}/estimar-precios`, {});
+        hermes?: { disclaimer?: string; lineas?: number; fallback?: boolean };
+      }>(`/api/cotizaciones/${id}/hermes-cotizar`, {});
       await fetchCotizacion();
-      const n = result?.estimacion?.lineas;
+      const h = result?.hermes;
       alert(
-        result?.estimacion?.disclaimer ||
-          `Estimación lista${n ? ` (${n} líneas)` : ''}. Revisa precios antes de enviar.`,
+        h?.disclaimer ||
+          `Borrador Hermes listo${h?.lineas ? ` (${h.lineas} líneas)` : ''}${
+            h?.fallback ? ' — usó fallback heurístico' : ''
+          }. Revisa antes de enviar.`,
       );
     } catch (err: any) {
       const msg =
         err instanceof ApiError
           ? err.data?.message || err.message
-          : err?.message || 'Error al estimar precios';
+          : err?.message || 'Error al cotizar con Hermes';
       setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setActionLoading('');
+    }
+  };
+
+  const handleHermesChatSend = async () => {
+    const message = hermesChatInput.trim();
+    if (!message || !id) return;
+    setHermesChatBusy(true);
+    setError('');
+    const nextLog = [...hermesChatLog, { role: 'user' as const, content: message }];
+    setHermesChatLog(nextLog);
+    setHermesChatInput('');
+    try {
+      const result = await post<{
+        reply?: string;
+        applied?: number;
+      }>(`/api/cotizaciones/${id}/hermes-chat`, {
+        message,
+        history: hermesChatLog,
+      });
+      setHermesChatLog([
+        ...nextLog,
+        { role: 'assistant', content: result?.reply || '(sin respuesta)' },
+      ]);
+      if (result?.applied) await fetchCotizacion();
+    } catch (err: any) {
+      const msg =
+        err instanceof ApiError
+          ? err.data?.message || err.message
+          : err?.message || 'Error en chat Hermes';
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    } finally {
+      setHermesChatBusy(false);
     }
   };
 
@@ -442,16 +482,26 @@ export default function CotizacionDetallePage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={handleEstimarPrecios}
+                onClick={handleHermesCotizar}
                 disabled={!!actionLoading}
                 className="gap-2"
+                title="Re-cotizar con Hermes LongCat"
               >
-                {actionLoading === 'estimar' ? (
+                {actionLoading === 'hermes' ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                Estimar precios IA
+                Re-cotizar Hermes
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHermesChatOpen((v) => !v)}
+                disabled={!!actionLoading}
+                className="gap-2"
+              >
+                Chat Hermes
               </Button>
               <Button
                 variant="outline"
@@ -557,6 +607,132 @@ export default function CotizacionDetallePage() {
             </div>
           )}
         </div>
+
+        {hermesChatOpen && (estatus === 'BORRADOR' || estatus === 'EN_REVISION') && (
+          <Card className="border-border">
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm font-medium">
+                Chat Hermes (LongCat) — ajusta el borrador
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="max-h-48 overflow-y-auto space-y-2 rounded-md border border-border bg-muted/20 p-2 text-xs">
+                {hermesChatLog.length === 0 && (
+                  <p className="text-muted-foreground">
+                    Ej: «Sube 10% a todo el Delrin» o «Explica el precio de
+                    260272-001». Si Hermes responde JSON de precios, se aplican
+                    al borrador.
+                  </p>
+                )}
+                {hermesChatLog.map((m, i) => (
+                  <div
+                    key={i}
+                    className={
+                      m.role === 'user'
+                        ? 'text-right text-foreground'
+                        : 'text-left text-muted-foreground whitespace-pre-wrap'
+                    }
+                  >
+                    <span className="font-medium">
+                      {m.role === 'user' ? 'Tú' : 'Hermes'}:
+                    </span>{' '}
+                    {m.content}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={hermesChatInput}
+                  disabled={hermesChatBusy}
+                  onChange={(e) => setHermesChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleHermesChatSend();
+                    }
+                  }}
+                  placeholder="Mensaje para Hermes…"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={hermesChatBusy || !hermesChatInput.trim()}
+                  onClick={handleHermesChatSend}
+                >
+                  {hermesChatBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Enviar'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {hermesChatOpen && (estatus === 'BORRADOR' || estatus === 'EN_REVISION') && (
+          <Card className="border-border">
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm font-medium">
+                Chat Hermes (LongCat) — ajusta el borrador
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="max-h-48 overflow-y-auto space-y-2 rounded-md border border-border bg-muted/20 p-2 text-xs">
+                {hermesChatLog.length === 0 && (
+                  <p className="text-muted-foreground">
+                    Ej: «Sube 10% a todo el Delrin» o «Explica el precio de
+                    260272-001». Si Hermes responde JSON de precios, se aplican
+                    al borrador.
+                  </p>
+                )}
+                {hermesChatLog.map((m, i) => (
+                  <div
+                    key={i}
+                    className={
+                      m.role === 'user'
+                        ? 'text-right text-foreground'
+                        : 'text-left text-muted-foreground whitespace-pre-wrap'
+                    }
+                  >
+                    <span className="font-medium">
+                      {m.role === 'user' ? 'Tú' : 'Hermes'}:
+                    </span>{' '}
+                    {m.content}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={hermesChatInput}
+                  disabled={hermesChatBusy}
+                  onChange={(e) => setHermesChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleHermesChatSend();
+                    }
+                  }}
+                  placeholder="Mensaje para Hermes…"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={hermesChatBusy || !hermesChatInput.trim()}
+                  onClick={handleHermesChatSend}
+                >
+                  {hermesChatBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Enviar'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Error message */}
         {error && (
