@@ -4,7 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage.service';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto';
 import { CotizacionesService } from './cotizaciones.service';
-import { parseBomCsv, pdfStem, BomRow } from './bom-parser';
+import { parseBomAuto, pdfStem, BomRow } from './bom-parser';
 
 export type DesdePaqueteInput = {
   zipBuffer: Buffer;
@@ -27,7 +27,7 @@ export class CotizacionPaqueteService {
   async createFromPaquete(input: DesdePaqueteInput) {
     let bom: BomRow[];
     try {
-      bom = parseBomCsv(input.bomText);
+      bom = parseBomAuto(input.bomText);
     } catch (e: any) {
       throw new BadRequestException(e?.message || 'BOM inválido');
     }

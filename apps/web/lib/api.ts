@@ -135,6 +135,12 @@ async function apiClient<T = any>(
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    // Global 401 handler: token expired or invalid → redirect to login
+    if (res.status === 401 && typeof window !== 'undefined' && !path.includes('/auth/login')) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
     throw new ApiError(res.status, data);
   }
 
@@ -184,6 +190,12 @@ export async function postForm<T = any>(
   const res = await fetch(url, { method: 'POST', headers, body: form });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    // Global 401 handler: token expired or invalid → redirect to login
+    if (res.status === 401 && typeof window !== 'undefined' && !path.includes('/auth/login')) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
     throw new ApiError(res.status, data);
   }
   return res.json();
@@ -272,7 +284,8 @@ export async function uploadPlano(
   formData.append('version', String(version));
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-  const res = await fetch(resolveApiUrl(`/api/ingenieria/${proyectoId}/planos`), {
+  const uploadUrl = resolveApiUrl(`/api/ingenieria/${proyectoId}/planos`);
+  const res = await fetch(uploadUrl, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -280,6 +293,12 @@ export async function uploadPlano(
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    // Global 401 handler: token expired or invalid → redirect to login
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
     throw new ApiError(res.status, data);
   }
 

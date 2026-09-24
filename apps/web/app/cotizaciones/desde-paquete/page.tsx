@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { get, postForm, ApiError } from '@/lib/api';
+import { parseBomAuto, type BomRow } from '@/lib/bom-parser';
 import {
   ArrowLeft,
   Upload,
@@ -12,11 +13,19 @@ import {
   Loader2,
   AlertCircle,
   Package,
+  ClipboardPaste,
+  FileSpreadsheet,
+  CheckCircle2,
+  XCircle,
+  Info,
+  Eraser,
 } from 'lucide-react';
 
 const BOM_PLACEHOLDER = `Item,DWG,Material,QTY
 1,260262-002,BLACK DELRIN,16
-2,260262-003,BLACK DELRIN,4`;
+2,260262-003,BLACK DELRIN,4
+
+— o pega la tabla de Outlook (Ctrl+V); también sirve celda por línea —`;
 
 interface ClienteOpt {
   id: string;
@@ -43,6 +52,12 @@ function DesdePaqueteContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [loadingClientes, setLoadingClientes] = useState(true);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const [parsedBom, setParsedBom] = useState<BomRow[]>([]);
+  const [parseError, setParseError] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -61,6 +76,54 @@ function DesdePaqueteContent() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!bom.trim()) {
+      setParsedBom([]);
+      setParseError('');
+      return;
+    }
+    try {
+      setParsedBom(parseBomAuto(bom));
+      setParseError('');
+    } catch (e: any) {
+      setParsedBom([]);
+      setParseError(e?.message || 'Error al parsear');
+    }
+  }, [bom]);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setBom(text);
+        setError('');
+      }
+    } catch {
+      setError(
+        'No se pudo leer el portapapeles. Usa Ctrl+V (o Cmd+V) dentro del cuadro BOM.',
+      );
+      textareaRef.current?.focus();
+    }
+  }, []);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (
+      file &&
+      (file.name.endsWith('.csv') ||
+        file.name.endsWith('.tsv') ||
+        file.name.endsWith('.txt'))
+    ) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setBom((ev.target?.result as string) || '');
+      };
+      reader.readAsText(file);
+    }
+  }, []);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
@@ -73,7 +136,13 @@ function DesdePaqueteContent() {
       return;
     }
     if (!bom.trim()) {
-      setError('Pega la tabla BOM (Item,DWG,Material,QTY)');
+      setError('Pega la tabla BOM (Item, DWG, Material, QTY)');
+      return;
+    }
+    try {
+      parseBomAuto(bom);
+    } catch (err: any) {
+      setError(err?.message || 'BOM inválido');
       return;
     }
 
@@ -112,8 +181,12 @@ function DesdePaqueteContent() {
     }
   }
 
+  const doubtful = parsedBom.filter(
+    (r) => !r.material || !/^\d{4,}-\d+/.test(r.dwg),
+  );
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 animate-fade-up">
+    <div className="mx-auto max-w-4xl space-y-6 animate-fade-up">
       <div className="flex items-start gap-3">
         <Button
           type="button"
@@ -130,7 +203,7 @@ function DesdePaqueteContent() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Sube el ZIP de planos PDF y pega la tabla Item / DWG / Material /
-            QTY. Se crea un borrador con precio 0 para completar.
+            QTY (Outlook, CSV o TSV). Se crea un borrador con precio 0.
           </p>
         </div>
       </div>
@@ -198,23 +271,166 @@ function DesdePaqueteContent() {
           )}
         </label>
 
-        <label className="block space-y-1.5 text-sm">
-          <span className="font-medium flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Tabla BOM
-          </span>
-          <textarea
-            className="min-h-[220px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed"
-            placeholder={BOM_PLACEHOLDER}
-            value={bom}
-            disabled={loading}
-            onChange={(e) => setBom(e.target.value)}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="font-medium flex items-center gap-2 text-sm">
+              <Package className="h-4 w-4" />
+              Tabla BOM
+            </span>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handlePaste}
+                disabled={loading}
+                className="gap-1.5"
+              >
+                <ClipboardPaste className="h-3.5 w-3.5" />
+                Pegar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+                className="gap-1.5"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                CSV/TSV
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setBom('');
+                  setError('');
+                }}
+                disabled={loading || !bom}
+                className="gap-1.5"
+              >
+                <Eraser className="h-3.5 w-3.5" />
+                Limpiar
+              </Button>
+            </div>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.tsv,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) =>
+                  setBom((ev.target?.result as string) || '');
+                reader.readAsText(file);
+              }
+            }}
           />
-          <span className="text-xs text-muted-foreground">
-            CSV o TSV con encabezados Item, DWG, Material, QTY. El DWG debe
-            coincidir con el nombre del PDF (ej. 260262-002.pdf).
-          </span>
-        </label>
+          <div
+            className={`relative rounded-md border-2 border-dashed transition-colors ${
+              dragOver ? 'border-brand bg-brand/5' : 'border-input'
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleFileDrop}
+          >
+            <textarea
+              ref={textareaRef}
+              className="min-h-[180px] w-full rounded-md bg-background px-3 py-2 font-mono text-xs leading-relaxed resize-y"
+              placeholder={BOM_PLACEHOLDER}
+              value={bom}
+              disabled={loading}
+              onChange={(e) => setBom(e.target.value)}
+              onPaste={() => setError('')}
+            />
+            {dragOver && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-md bg-brand/10">
+                <span className="text-sm font-medium text-brand">
+                  Suelta el archivo CSV/TSV aquí
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              Preferible <kbd className="px-1 rounded border">Ctrl+V</kbd> /
+              Cmd+V desde Outlook. También CSV, TSV o una celda por línea. El
+              DWG debe coincidir con el PDF (ej. 260272-001.pdf).
+            </span>
+          </div>
+        </div>
+
+        {bom.trim() && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-sm font-medium">Vista previa del BOM</span>
+              {parseError ? (
+                <span className="flex items-center gap-1 text-xs text-destructive">
+                  <XCircle className="h-3.5 w-3.5" />
+                  {parseError}
+                </span>
+              ) : parsedBom.length > 0 ? (
+                <span className="flex items-center gap-1 text-xs text-green-600">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {parsedBom.length} ítems detectados
+                  {doubtful.length > 0
+                    ? ` · ${doubtful.length} a revisar`
+                    : ''}
+                </span>
+              ) : null}
+            </div>
+            {parsedBom.length > 0 && (
+              <div className="max-h-[240px] overflow-auto rounded-md border border-border bg-background">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-muted">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium">Item</th>
+                      <th className="px-2 py-1.5 text-left font-medium">DWG</th>
+                      <th className="px-2 py-1.5 text-left font-medium">
+                        Material
+                      </th>
+                      <th className="px-2 py-1.5 text-right font-medium">QTY</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedBom.map((row, i) => {
+                      const warn =
+                        !row.material || !/^\d{4,}-\d+/.test(row.dwg);
+                      return (
+                        <tr
+                          key={`${row.item}-${row.dwg}-${i}`}
+                          className={`border-t border-border ${
+                            warn ? 'bg-amber-500/10' : ''
+                          }`}
+                        >
+                          <td className="px-2 py-1">{row.item}</td>
+                          <td className="px-2 py-1 font-mono">{row.dwg}</td>
+                          <td className="px-2 py-1">
+                            {row.material || (
+                              <span className="text-muted-foreground italic">
+                                (sin material)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1 text-right">{row.qty}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         <label className="block space-y-1.5 text-sm">
           <span className="font-medium">Notas (opcional)</span>
@@ -236,7 +452,11 @@ function DesdePaqueteContent() {
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading} className="gap-2">
+          <Button
+            type="submit"
+            disabled={loading || !!parseError || !parsedBom.length}
+            className="gap-2"
+          >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

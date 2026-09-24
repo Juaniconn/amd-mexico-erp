@@ -1,3 +1,4 @@
+/** Keep in sync with apps/api/src/modules/cotizaciones/bom-parser.ts */
 export type BomRow = {
   item: number;
   dwg: string;
