@@ -265,14 +265,13 @@ docker run -d --name amd-erp-web --network host --restart unless-stopped \
 
 ---
 
-## Cotización Hermes (LongCat)
+## Cotización Hermes (Nous :free)
 
 Happy path: `/cotizaciones/desde-paquete` → ZIP + BOM → **Generar borrador** (Hermes ON).
-- Modelo: `meituan/longcat-2.0:free` vía `hermes proxy` (`127.0.0.1:8645`, systemd user `hermes-proxy.service`).
-- Skill: `~/.hermes/skills/amd-web-app/amd-cotizacion/SKILL.md`
-- QTY solo del BOM; PDF solo manufactura (se ignora QTY del plano).
-- API: `POST …/desde-paquete?conHermes=true`, `…/:id/hermes-cotizar`, `…/:id/hermes-chat`
-- Detalle: **Re-cotizar Hermes** + **Chat Hermes**. El botón viejo «Estimar precios IA» quedó como fallback API `estimar-precios`.
+- Cascada :free (LongCat primero): longcat → step-3.7-flash → solar-pro4 → laguna-s → laguna-xs → ling-fin → ling-sante. Rate-limit → siguiente modelo. **Sin heurística.**
+- Proxy: `hermes-proxy.service` (`127.0.0.1:8645`). Skill: `~/.hermes/skills/amd-web-app/amd-cotizacion`.
+- QTY solo BOM; PDF = manufactura.
+- API: `desde-paquete` (`conHermes`), `hermes-cotizar`, `hermes-chat`.
 
 ## Agentes Disponibles (Skills de Hermes)
 

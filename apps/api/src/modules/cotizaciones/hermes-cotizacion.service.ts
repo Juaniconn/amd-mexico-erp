@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadGatewayException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage.service';
@@ -13,7 +18,6 @@ import {
   SETUP_MINUTES,
   MARGIN,
 } from './material-price-book';
-import { CotizacionEstimacionService } from './cotizacion-estimacion.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,17 +27,80 @@ export type HermesLineQuote = {
   rationale: string;
 };
 
-const DEFAULT_MODEL = process.env.HERMES_COTIZACION_MODEL || 'meituan/longcat-2.0:free';
+/**
+ * Cascada Nous :free — LongCat primero; si rate-limit / overload, el siguiente.
+ * Sobrescribible: HERMES_COTIZACION_MODELS=modelo1,modelo2,...
+ */
+export const NOUS_FREE_MODEL_CASCADE = [
+  'meituan/longcat-2.0:free',
+  'stepfun/step-3.7-flash:free',
+  'upstage/solar-pro4:free',
+  'poolside/laguna-s-2.1:free',
+  'poolside/laguna-xs-2.1:free',
+  'inclusionai/ling-3.0-flash-fin:free',
+  'inclusionai/ling-3.0-flash-sante:free',
+];
+
+export function resolveModelCascade(): string[] {
+  const fromEnv = process.env.HERMES_COTIZACION_MODELS?.trim();
+  if (fromEnv) {
+    return fromEnv
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  const primary = process.env.HERMES_COTIZACION_MODEL?.trim();
+  if (primary && !NOUS_FREE_MODEL_CASCADE.includes(primary)) {
+    return [primary, ...NOUS_FREE_MODEL_CASCADE];
+  }
+  if (primary && primary !== NOUS_FREE_MODEL_CASCADE[0]) {
+    return [
+      primary,
+      ...NOUS_FREE_MODEL_CASCADE.filter((m) => m !== primary),
+    ];
+  }
+  return [...NOUS_FREE_MODEL_CASCADE];
+}
+
 const PROXY_URL =
   process.env.HERMES_PROXY_URL || 'http://127.0.0.1:8645/v1/chat/completions';
 const USD_TO_MXN = Number(process.env.USD_TO_MXN || 17.5);
+
+/** Detect rate limit / capacity errors from Nous / OpenAI-compatible proxies. */
+export function isRateLimitOrCapacityError(
+  status: number,
+  bodyText: string,
+): boolean {
+  if (status === 429) return true;
+  if (status === 503 || status === 502) {
+    const t = (bodyText || '').toLowerCase();
+    return (
+      t.includes('rate') ||
+      t.includes('limit') ||
+      t.includes('capacity') ||
+      t.includes('overload') ||
+      t.includes('quota') ||
+      t.includes('too many') ||
+      t.includes('unavailable')
+    );
+  }
+  const t = (bodyText || '').toLowerCase();
+  return (
+    t.includes('rate limit') ||
+    t.includes('rate_limit') ||
+    t.includes('tokens per') ||
+    t.includes('quota exceeded') ||
+    t.includes('capacity exceeded') ||
+    t.includes('model is overloaded')
+  );
+}
 
 const SYSTEM_PROMPT = `Eres el cotizador CNC de AMD México (Ciudad Juárez / maquila frontera).
 Reglas OBLIGATORIAS:
 1) La cantidad pedida (qtyBom) viene SOLO del BOM del cliente. IGNORA cualquier QTY del texto del plano PDF.
 2) El extracto del plano sirve para material, dims, complejidad y manufactura de ESA pieza.
 3) Cotiza precio UNITARIO en la moneda indicada (USD o MXN). Si moneda=MXN y razonas en USD, convierte ~${USD_TO_MXN} MXN/USD.
-4) Anclas taller: ~$${SHOP_RATE_USD_PER_HOUR}/h, setup ~${SETUP_MINUTES} min, margen ~${(MARGIN * 100).toFixed(0)}%.
+4) Anclas taller: ~$${SHOP_RATE_USD_PER_HOUR}/h, setup ~${SETUP_MINUTES} min, margen ~${(MARGIN * 100).toFixed(0)}%. heuristicUsdRef es solo referencia, no lo copies ciegamente.
 5) Responde SOLO JSON válido sin markdown:
 {"lines":[{"dwg":"...","precioUnitario":number,"rationale":"..."}],"notes":"..."}
 Una línea por cada dwg del input. precioUnitario > 0. No inventes dims ausentes.`;
@@ -45,7 +112,6 @@ export class HermesCotizacionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly fallbackEstimacion: CotizacionEstimacionService,
   ) {}
 
   /** Load skill text if present (for richer system prompt). */
@@ -137,74 +203,114 @@ export class HermesCotizacionService {
     lines: HermesLineQuote[];
     notes: string;
     raw: string;
-  } | null> {
+    model: string;
+    tried: string[];
+  }> {
     const skill = this.loadSkillExtra();
     const system = skill
       ? `${SYSTEM_PROMPT}\n\n--- Skill amd-cotizacion ---\n${skill}`
       : SYSTEM_PROMPT;
+    const cascade = resolveModelCascade();
+    const tried: string[] = [];
+    let lastErr = '';
 
-    const body = {
-      model: DEFAULT_MODEL,
-      temperature: 0.2,
-      messages: [
-        { role: 'system', content: system },
-        {
-          role: 'user',
-          content:
-            'Cotiza estas líneas. qtyBom es la única cantidad válida. Ignora QTY del plano.\n' +
-            JSON.stringify(userPayload, null, 2),
-        },
-      ],
-    };
-
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 180_000);
-    try {
-      const res = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer hermes-proxy',
-        },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        this.logger.warn(`Hermes proxy HTTP ${res.status}: ${t.slice(0, 300)}`);
-        return null;
-      }
-      const data = (await res.json()) as any;
-      const raw = String(data?.choices?.[0]?.message?.content || '').trim();
-      if (!raw) return null;
-      const parsed = this.extractJson(raw);
-      if (!parsed?.lines?.length) {
-        this.logger.warn(`Hermes JSON inválido: ${raw.slice(0, 400)}`);
-        return null;
-      }
-      const lines: HermesLineQuote[] = parsed.lines
-        .filter(
-          (l: any) =>
-            l?.dwg &&
-            Number.isFinite(Number(l.precioUnitario)) &&
-            Number(l.precioUnitario) > 0,
-        )
-        .map((l: any) => ({
-          dwg: String(l.dwg).toUpperCase(),
-          precioUnitario: Number(l.precioUnitario),
-          rationale: String(l.rationale || 'hermes'),
-        }));
-      return {
-        lines,
-        notes: String(parsed.notes || ''),
-        raw,
+    for (const model of cascade) {
+      tried.push(model);
+      const body = {
+        model,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: system },
+          {
+            role: 'user',
+            content:
+              'Cotiza estas líneas. qtyBom es la única cantidad válida. Ignora QTY del plano.\n' +
+              JSON.stringify(userPayload, null, 2),
+          },
+        ],
       };
-    } catch (e: any) {
-      this.logger.warn(`Hermes call fail: ${e?.message || e}`);
-      return null;
-    } finally {
-      clearTimeout(timer);
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 180_000);
+      try {
+        const res = await fetch(PROXY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer hermes-proxy',
+          },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+        const t = await res.text();
+        if (!res.ok) {
+          lastErr = `HTTP ${res.status}: ${t.slice(0, 200)}`;
+          if (isRateLimitOrCapacityError(res.status, t)) {
+            this.logger.warn(
+              `Rate/capacity en ${model} → siguiente modelo (${cascade.indexOf(model) + 1}/${cascade.length})`,
+            );
+            continue;
+          }
+          this.logger.warn(`Hermes ${model}: ${lastErr}`);
+          // otros errores: también probar siguiente :free
+          continue;
+        }
+        let data: any;
+        try {
+          data = JSON.parse(t);
+        } catch {
+          lastErr = `JSON inválido del proxy: ${t.slice(0, 120)}`;
+          continue;
+        }
+        const raw = String(data?.choices?.[0]?.message?.content || '').trim();
+        if (!raw) {
+          lastErr = `${model}: respuesta vacía`;
+          continue;
+        }
+        const parsed = this.extractJson(raw);
+        if (!parsed?.lines?.length) {
+          lastErr = `${model}: JSON de cotización inválido`;
+          this.logger.warn(`${lastErr}: ${raw.slice(0, 300)}`);
+          continue;
+        }
+        const lines: HermesLineQuote[] = parsed.lines
+          .filter(
+            (l: any) =>
+              l?.dwg &&
+              Number.isFinite(Number(l.precioUnitario)) &&
+              Number(l.precioUnitario) > 0,
+          )
+          .map((l: any) => ({
+            dwg: String(l.dwg).toUpperCase(),
+            precioUnitario: Number(l.precioUnitario),
+            rationale: String(l.rationale || 'hermes'),
+          }));
+        if (!lines.length) {
+          lastErr = `${model}: sin líneas válidas`;
+          continue;
+        }
+        if (tried.length > 1) {
+          this.logger.log(`Cotización OK con fallback de modelo: ${model}`);
+        }
+        return {
+          lines,
+          notes: String(parsed.notes || ''),
+          raw,
+          model,
+          tried,
+        };
+      } catch (e: any) {
+        lastErr = e?.message || String(e);
+        this.logger.warn(`Hermes ${model} fail: ${lastErr}`);
+        continue;
+      } finally {
+        clearTimeout(timer);
+      }
     }
+
+    throw new BadGatewayException(
+      `Ningún modelo Nous :free respondió. Probados: ${tried.join(', ')}. Último error: ${lastErr}`,
+    );
   }
 
   /** Pull JSON object from model output (tolerates ``` fences). */
@@ -223,22 +329,19 @@ export class HermesCotizacionService {
   }
 
   /**
-   * Cotiza con Hermes (LongCat via proxy). Fallback heurístico si falla.
+   * Cotiza con Hermes/Nous (cascada :free). Sin fallback heurístico.
    * Batches de a 12 líneas para no saturar contexto free.
    */
-  async cotizarConHermes(cotizacionId: string, opts?: { forceFallback?: boolean }) {
+  async cotizarConHermes(cotizacionId: string) {
     const { cot, lines } = await this.buildLinesPayload(cotizacionId);
     const moneda = (cot.moneda as string) || 'MXN';
     const runAt = new Date().toISOString();
 
-    if (opts?.forceFallback) {
-      return this.fallbackEstimacion.estimarPrecios(cotizacionId);
-    }
-
     const batchSize = 12;
     const allQuotes = new Map<string, HermesLineQuote>();
-    let hermesNotes: string[] = [];
-    let usedHermes = false;
+    const hermesNotes: string[] = [];
+    const modelsUsed = new Set<string>();
+    const allTried = new Set<string>();
 
     for (let i = 0; i < lines.length; i += batchSize) {
       const batch = lines.slice(i, i + batchSize);
@@ -250,69 +353,46 @@ export class HermesCotizacionService {
           margin: MARGIN,
           usdToMxn: USD_TO_MXN,
         },
-        lines: batch.map(({ dwg, qtyBom, materialBom, planoExtract, heuristicUsd }) => ({
-          dwg,
-          qtyBom,
-          materialBom,
-          planoExtract,
-          heuristicUsdRef: heuristicUsd,
-        })),
+        lines: batch.map(
+          ({ dwg, qtyBom, materialBom, planoExtract, heuristicUsd }) => ({
+            dwg,
+            qtyBom,
+            materialBom,
+            planoExtract,
+            heuristicUsdRef: heuristicUsd,
+          }),
+        ),
       };
       const result = await this.callHermesJson(payload);
-      if (result?.lines?.length) {
-        usedHermes = true;
-        for (const q of result.lines) allQuotes.set(q.dwg, q);
-        if (result.notes) hermesNotes.push(result.notes);
-      }
+      modelsUsed.add(result.model);
+      result.tried.forEach((m) => allTried.add(m));
+      for (const q of result.lines) allQuotes.set(q.dwg, q);
+      if (result.notes) hermesNotes.push(result.notes);
     }
 
-    if (!usedHermes || allQuotes.size === 0) {
-      this.logger.warn('Hermes vacío → fallback heurístico');
-      const fb = await this.fallbackEstimacion.estimarPrecios(cotizacionId);
-      return {
-        ...fb,
-        hermes: { used: false, fallback: true, model: DEFAULT_MODEL },
-      };
+    if (allQuotes.size === 0) {
+      throw new BadGatewayException(
+        'Hermes no devolvió precios. No se aplicó estimación heurística.',
+      );
     }
 
     let updated = 0;
     const sample: string[] = [];
+    const missing: string[] = [];
 
     for (const d of cot.detalles) {
       const dwg = (d.numeroParte || d.piezaNombre || '').toUpperCase();
       const q = allQuotes.get(dwg);
-      const lineMeta = lines.find((l) => l.dwg === dwg);
-      let precio: number;
-      let rationale: string;
-
-      if (q) {
-        precio = q.precioUnitario;
-        // Safety vs heuristic (USD space)
-        if (lineMeta && moneda === 'USD') {
-          const lo = lineMeta.heuristicUsd * 0.35;
-          const hi = lineMeta.heuristicUsd * 3;
-          precio = Math.min(hi, Math.max(lo, precio));
-        } else if (lineMeta && moneda === 'MXN') {
-          const href = lineMeta.heuristicUsd * USD_TO_MXN;
-          const lo = href * 0.35;
-          const hi = href * 3;
-          precio = Math.min(hi, Math.max(lo, precio));
-        }
-        rationale = q.rationale;
-      } else if (lineMeta) {
-        precio =
-          moneda === 'MXN'
-            ? Math.round(lineMeta.heuristicUsd * USD_TO_MXN * 100) / 100
-            : lineMeta.heuristicUsd;
-        rationale = 'fallback heurístico (Hermes no devolvió esta línea)';
-      } else {
+      if (!q) {
+        missing.push(dwg);
         continue;
       }
 
-      precio = Math.round(precio * 100) / 100;
+      const precio = Math.round(q.precioUnitario * 100) / 100;
       const aiNote = [
         `Hermes ${runAt.slice(0, 10)}`,
-        rationale,
+        `modelo=${[...modelsUsed].join('|')}`,
+        q.rationale,
         'QTY=BOM (no plano)',
         'REQUIERE REVISIÓN HUMANA',
       ].join(' | ');
@@ -333,6 +413,12 @@ export class HermesCotizacionService {
       if (sample.length < 8) sample.push(`${dwg}: $${precio} ${moneda}`);
     }
 
+    if (missing.length) {
+      this.logger.warn(
+        `Hermes no cotizó ${missing.length} DWG: ${missing.slice(0, 8).join(', ')}`,
+      );
+    }
+
     const fresh = await this.prisma.detalleCotizacion.findMany({
       where: { cotizacionId },
     });
@@ -344,7 +430,7 @@ export class HermesCotizacionService {
     const iva = subtotal * 0.16;
     const total = subtotal + iva;
 
-    const stamp = `\n--- Borrador Hermes ${runAt} ---\nModelo: ${DEFAULT_MODEL}. Líneas: ${updated}/${cot.detalles.length}. QTY solo BOM. ${hermesNotes.join(' ')}\nPrecios estimados — revisar antes de enviar.\n`;
+    const stamp = `\n--- Borrador Hermes ${runAt} ---\nModelos: ${[...modelsUsed].join(', ')}. Probados: ${[...allTried].join(', ')}. Líneas: ${updated}/${cot.detalles.length}${missing.length ? ` (faltan: ${missing.join(', ')})` : ''}. QTY solo BOM. ${hermesNotes.join(' ')}\nSin heurística. Revisar antes de enviar.\n`;
 
     const cotizacion = await this.prisma.cotizacion.update({
       where: { id: cotizacionId },
@@ -362,12 +448,14 @@ export class HermesCotizacionService {
       hermes: {
         used: true,
         fallback: false,
-        model: DEFAULT_MODEL,
+        model: [...modelsUsed].join(', '),
+        modelsTried: [...allTried],
         lineas: updated,
+        missing,
         sample,
         notes: hermesNotes.join(' '),
         disclaimer:
-          'Borrador Hermes (LongCat). QTY del plano ignorada. Revisar antes de enviar.',
+          'Borrador Hermes (Nous :free, cascada). QTY del plano ignorada. Sin heurística. Revisar antes de enviar.',
       },
     };
   }
@@ -404,31 +492,63 @@ export class HermesCotizacionService {
       { role: 'user', content: message },
     ];
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 120_000);
+    const cascade = resolveModelCascade();
     let reply = '';
-    try {
-      const res = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer hermes-proxy',
-        },
-        body: JSON.stringify({
-          model: DEFAULT_MODEL,
-          temperature: 0.3,
-          messages,
-        }),
-        signal: ctrl.signal,
-      });
-      if (!res.ok) {
+    let usedModel = cascade[0];
+    let lastErr = '';
+
+    for (const model of cascade) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 120_000);
+      try {
+        const res = await fetch(PROXY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer hermes-proxy',
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.3,
+            messages,
+          }),
+          signal: ctrl.signal,
+        });
         const t = await res.text();
-        throw new Error(`Hermes HTTP ${res.status}: ${t.slice(0, 200)}`);
+        if (!res.ok) {
+          lastErr = `HTTP ${res.status}: ${t.slice(0, 200)}`;
+          if (isRateLimitOrCapacityError(res.status, t)) {
+            this.logger.warn(`Chat rate-limit ${model} → siguiente`);
+            continue;
+          }
+          continue;
+        }
+        let data: any;
+        try {
+          data = JSON.parse(t);
+        } catch {
+          lastErr = 'proxy JSON inválido';
+          continue;
+        }
+        reply = String(data?.choices?.[0]?.message?.content || '').trim();
+        if (!reply) {
+          lastErr = `${model}: vacío`;
+          continue;
+        }
+        usedModel = model;
+        break;
+      } catch (e: any) {
+        lastErr = e?.message || String(e);
+        continue;
+      } finally {
+        clearTimeout(timer);
       }
-      const data = (await res.json()) as any;
-      reply = String(data?.choices?.[0]?.message?.content || '').trim();
-    } finally {
-      clearTimeout(timer);
+    }
+
+    if (!reply) {
+      throw new BadGatewayException(
+        `Chat Hermes falló en todos los modelos :free. ${lastErr}`,
+      );
     }
 
     let applied = 0;
@@ -482,7 +602,7 @@ export class HermesCotizacionService {
     return {
       reply,
       applied,
-      model: DEFAULT_MODEL,
+      model: usedModel,
       cotizacion,
     };
   }

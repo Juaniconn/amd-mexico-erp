@@ -449,8 +449,8 @@ function DesdePaqueteContent() {
           <span>
             <span className="font-medium">Aplicar precios con Hermes</span>
             <span className="block text-xs text-muted-foreground">
-              LongCat analiza BOM + planos (ignora QTY del PDF). Recomendado.
-              Si falla, usa estimación heurística.
+              LongCat y cascada Nous :free (sin heurística). Si un modelo
+              llega a rate limit, prueba el siguiente automáticamente.
             </span>
           </span>
         </label>

@@ -1,7 +1,14 @@
-import { HermesCotizacionService } from '../hermes-cotizacion.service';
+import {
+  HermesCotizacionService,
+  isRateLimitOrCapacityError,
+  resolveModelCascade,
+  NOUS_FREE_MODEL_CASCADE,
+} from '../hermes-cotizacion.service';
 
 describe('HermesCotizacionService.extractJson', () => {
-  const svc = Object.create(HermesCotizacionService.prototype) as HermesCotizacionService;
+  const svc = Object.create(
+    HermesCotizacionService.prototype,
+  ) as HermesCotizacionService;
 
   it('parses raw JSON', () => {
     const j = svc.extractJson(
@@ -31,5 +38,20 @@ describe('BOM qty vs plano QTY policy', () => {
       .replace(/\bQUANTITY\s*[:=]?\s*\d+/gi, '[QTY_PLANO_IGNORADO]');
     expect(cleaned).toContain('[QTY_PLANO_IGNORADO]');
     expect(cleaned).not.toMatch(/QTY\s*99/i);
+  });
+});
+
+describe('Nous free model cascade', () => {
+  it('prioritizes LongCat', () => {
+    expect(NOUS_FREE_MODEL_CASCADE[0]).toBe('meituan/longcat-2.0:free');
+    expect(resolveModelCascade()[0]).toBe('meituan/longcat-2.0:free');
+  });
+
+  it('detects rate limit / capacity', () => {
+    expect(isRateLimitOrCapacityError(429, '')).toBe(true);
+    expect(
+      isRateLimitOrCapacityError(503, 'model is overloaded'),
+    ).toBe(true);
+    expect(isRateLimitOrCapacityError(400, 'bad request')).toBe(false);
   });
 });
